@@ -1,0 +1,35 @@
+#content {
+    margin-top: 8rem;
+    text-align: center;
+  }
+  
+  #room-code {
+    color: red;
+  }
+  
+  #start-button {
+    background-color: lightgreen;
+  }
+  
+  #start-button:hover {
+    cursor: pointer;
+  }
+  
+  #player-list li {
+    display: inline-block;
+    width: 180px;
+    margin: 0 12px 30px;
+  }
+  
+  #player-list li > img {
+    border: 1px solid black;
+    text-decoration: none;
+    display: block;
+    height: 130px;
+    background-color: aqua;
+  }
+  
+  #player-list li > h3 {
+    max-width: 140px;
+  }
+  
