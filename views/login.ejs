@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Login</title>
+    </head>
+
+    <body>
+        <p>Login</p>
+
+        <ul>
+            <% if (messages.success_message) { %>
+                <li><%= messages.success_message %></li>
+                <% } %>
+        </ul>
+
+        <ul>
+            <% if (messages.error) { %>
+                <li><%= messages.error %></li>
+                <% } %>
+        </ul>
+        
+
+            <form id="login-form" action="/login" method="POST">
+                <div>
+                    <input type="text" id="username" name="username" placeholder="Username" required>
+                </div>
+                <div>
+                    <input type="password" id="password" name="password" placeholder="Password" required/>
+                </div>
+                <div>
+                    <button type="submit">Login</button>
+                </div>
+                <a href="/register">Register here</a>
+            </form>
+
+    </body>
+
+</html>

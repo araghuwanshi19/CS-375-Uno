@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>UNO - CS375 / Lobby</title>
+    <style>
+      body {
+        text-align: center;
+      }
+
+      #player-list {
+        width: 100%;
+        position: fixed;
+        top: 0%;
+        padding: 0px;
+      }
+      
+      #player-list li {
+        display: inline-block;
+        width: 120px;
+        margin: 0 12px 30px;
+      }
+
+      #player-list li > img {
+        border: 1px solid black;
+        text-decoration: none;
+        height: 110px;
+        background-color: aqua;
+      }
+
+      #player-list li > h3, #player-list li > p {
+        text-align: center;
+        max-width: 120px;
+        font-size: 12px;
+      }
+
+      #piles {
+        width: 100%;
+        position: fixed;
+        bottom: 50%;
+      }
+
+      #discard-pile, #draw-pile {
+        display: inline-block;
+        border: 1px solid black;
+        height: 120px;
+        width: 120px;
+      }
+
+      #hand {
+        width: 100%;
+        position: fixed;
+        bottom: 0%;
+      }
+
+      #hand-table {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      #hand-table tr > td {
+        display: inline-block;
+        border: 1px solid black;
+        width: 120px;
+        height: 120px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="player-list-holder">
+      <ul id="player-list">
+        <% users.forEach(function(user){ %>
+          <li>
+            <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
+            <h3><%= user.name %></h3>
+            <p>Cards: <%= user.numCards %></p>
+          </li>
+        <% }); %>
+      </ul>
+    </div>
+    <div id="piles">
+      <div id="discard-pile">
+        Red Four
+      </div>
+      <div id="draw-pile">
+        Draw
+      </div>
+    </div>
+    <div id="hand">
+      <table id="hand-table">
+        <tr>
+          <% user.cards.forEach(function(card){ %>
+            <td>
+              <%= card.color %> <%= card.type %>
+            </td>
+          <% }); %>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>
