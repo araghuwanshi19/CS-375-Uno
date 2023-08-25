@@ -1,60 +1,25 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>UNO - CS375 / Lobby</title>
-    <style>
-      #content {
-        margin-top: 8rem;
-        text-align: center;
-      }
-
-      #room-code {
-        color: red;
-      }
-
-      #start-button {
-        background-color: lightgreen;
-      }
-
-      #start-button:hover {
-        cursor: pointer;
-      }
-
-      #player-list li {
-        display: inline-block;
-        width: 180px;
-        margin: 0 12px 30px;
-      }
-
-      #player-list li > img {
-        border: 1px solid black;
-        text-decoration: none;
-        display: block;
-        height: 130px;
-        background-color: aqua;
-      }
-
-      #player-list li > h3 {
-        max-width: 140px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="content">
-      <h1>Lobby</h1>
-      <h2>Room Code: <span id="room-code"><%= roomCode %></span></h2>
-      <% if (user.isHost) { %>
-        <button id="start-button">Start Game</button>
-      <% } %>
-      <h2>Players:</h2>
-      <ul id="player-list">
-        <% users.forEach(function(user){ %>
-          <li>
-            <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
-            <h3><%= user.name %></h3>
-          </li>
-        <% }); %>
-      </ul>
-    </div>
-  </body>
+<head>
+  <title>UNO - CS375 / Lobby</title>
+  <link rel="stylesheet" type="text/css" href="/lobby.css">
+</head>
+<body>
+  <div id="content">
+    <h1>Lobby</h1>
+    <h2>Room Code: <span id="room-code"><%= roomCode %></span></h2>
+    <% if (user.isHost) { %>
+      <button id="start-button">Start Game</button>
+    <% } %>
+    <h2>Players:</h2>
+    <ul id="player-list">
+      <% users.forEach(function(user){ %>
+        <li>
+          <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
+          <h3><%= user.name %></h3>
+        </li>
+      <% }); %>
+    </ul>
+  </div>
+</body>
 </html>

@@ -10,38 +10,56 @@
         <a href="/logout">Logout</a>
 
         <h1>Hello, <%= user.charAt(0).toUpperCase() + user.slice(1) %>!</h1>
-
+<!-- 
         <h1>WebSocket Test</h1>
         <div id="messages"></div>
         <input type="text" id="messageInput" placeholder="Type a message">
-        <button id="sendMessage">Send</button>
+        <button id="sendMessage">Send</button> -->
+
+
+        <a href="/new-game">Start New Game</a>
+
+        <div>
+            <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
+            <button id="joinGameButton">Join Game</button>
+        </div>
 
         <script>
             const socket = io();
             sendBtn = document.getElementById('sendMessage');
+            const joinGameButton = document.getElementById('joinGameButton');
+            const roomCodeInput = document.getElementById('roomCodeInput');
 
-            // listen for messages from server
-            socket.on('message', (msg) => {
-            const messagesDiv = document.getElementById('messages');
-            const newMessage = document.createElement('p');
-            newMessage.textContent = msg;
-            messagesDiv.appendChild(newMessage);
+            // redirect user to lobby with same room code
+            joinGameButton.addEventListener('click', () => {
+                const roomCode = roomCodeInput.value.trim();
+                if (roomCode) {
+                    window.location.href = `/lobby?room=${roomCode}`;
+                }
             });
 
-            // emit chat messages sent by clients
-            sendBtn.addEventListener('click', () => {
-                let messageInput = document.getElementById('messageInput').value;
-                socket.emit('chatMessage', messageInput);
-                messageInput = '';
-            });
+            // // listen for messages from server
+            // socket.on('message', (msg) => {
+            // const messagesDiv = document.getElementById('messages');
+            // const newMessage = document.createElement('p');
+            // newMessage.textContent = msg;
+            // messagesDiv.appendChild(newMessage);
+            // });
 
-            // listen for chat messages (from server)
-            socket.on('chatMessage', (message) => {
-                const messagesDiv = document.getElementById('messages');
-                const newMessage = document.createElement('p');
-                newMessage.textContent = message;
-                messagesDiv.appendChild(newMessage);
-            });
+            // // emit chat messages sent by clients
+            // sendBtn.addEventListener('click', () => {
+            //     let messageInput = document.getElementById('messageInput').value;
+            //     socket.emit('chatMessage', messageInput);
+            //     messageInput = '';
+            // });
+
+            // // listen for chat messages (from server)
+            // socket.on('chatMessage', (message) => {
+            //     const messagesDiv = document.getElementById('messages');
+            //     const newMessage = document.createElement('p');
+            //     newMessage.textContent = message;
+            //     messagesDiv.appendChild(newMessage);
+            // });
         </script>
     </body>
 </html>

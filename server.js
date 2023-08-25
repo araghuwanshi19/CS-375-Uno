@@ -8,6 +8,7 @@ const passport = require('passport');
 const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
+const shortid = require('shortid');
 
 const httpServer = http.createServer(app);
 const wsServer = socketIO(httpServer);
@@ -157,6 +158,16 @@ app.post('/register', async (req, res) => {
             throw err;
         }
     }
+});
+
+app.get("/new-game", (req, res) => {
+    const newRoomCode = shortid.generate();
+    res.redirect(`/lobby?room=${newRoomCode}`);
+});
+
+app.get("/lobby", (req, res) => {
+    const roomCode = req.query.room;
+    res.render("lobby", { roomCode });
 });
 
 app.post('/login', passport.authenticate('local', {
