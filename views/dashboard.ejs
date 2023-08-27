@@ -10,56 +10,74 @@
         <a href="/logout">Logout</a>
 
         <h1>Hello, <%= user.charAt(0).toUpperCase() + user.slice(1) %>!</h1>
-<!-- 
-        <h1>WebSocket Test</h1>
-        <div id="messages"></div>
-        <input type="text" id="messageInput" placeholder="Type a message">
-        <button id="sendMessage">Send</button> -->
 
+        <button id="newLobbyBtn">Start New Game</button>
 
-        <a href="/new-game">Start New Game</a>
+        <div id="messageContainer"></div>
+
+        <ul>
+            <% if(typeof errors != 'undefined') { %> <% errors.forEach(error => { %>
+            <li><%= error.message %></li>
+            <% }) %> <% } %>
+        </ul>
 
         <div>
-            <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
-            <button id="joinGameButton">Join Game</button>
+            <input id="joinInput" placeholder="Enter Room Code">
+            <button id="joinBtn">Join Room</button>
         </div>
 
         <script>
             const socket = io();
-            sendBtn = document.getElementById('sendMessage');
-            const joinGameButton = document.getElementById('joinGameButton');
-            const roomCodeInput = document.getElementById('roomCodeInput');
 
-            // redirect user to lobby with same room code
-            joinGameButton.addEventListener('click', () => {
-                const roomCode = roomCodeInput.value.trim();
-                if (roomCode) {
-                    window.location.href = `/lobby?room=${roomCode}`;
-                }
+            const newLobbyBtn = document.getElementById('newLobbyBtn');
+            const joinBtn = document.getElementById('joinBtn');
+            const joinInput = document.getElementById('joinInput');
+            const messageContainer = document.getElementById('messageContainer');
+            let newMessage = document.createElement('p');
+
+
+            newLobbyBtn.addEventListener('click', () => {
+                socket.emit('newLobby');
             });
 
-            // // listen for messages from server
-            // socket.on('message', (msg) => {
-            // const messagesDiv = document.getElementById('messages');
-            // const newMessage = document.createElement('p');
-            // newMessage.textContent = msg;
-            // messagesDiv.appendChild(newMessage);
-            // });
+            joinBtn.addEventListener('click', () => {
+                const roomCode = joinInput.value;
+                socket.emit('joinLobby', roomCode);
+            });
 
-            // // emit chat messages sent by clients
-            // sendBtn.addEventListener('click', () => {
-            //     let messageInput = document.getElementById('messageInput').value;
-            //     socket.emit('chatMessage', messageInput);
-            //     messageInput = '';
-            // });
+            socket.on('lobbyNotFound', () => {
+                messageContainer.textContent = 'Lobby not found';
+            });
 
-            // // listen for chat messages (from server)
-            // socket.on('chatMessage', (message) => {
-            //     const messagesDiv = document.getElementById('messages');
-            //     const newMessage = document.createElement('p');
-            //     newMessage.textContent = message;
-            //     messagesDiv.appendChild(newMessage);
+            socket.on('lobbyCreated', (roomCode) => {
+              messageContainer.textContent = `You're in! Invite others with code: ${roomCode}`;
+            });
+
+            socket.on('playerJoined', (playerCount) => {
+              newMessage.textContent = `A player joined. Current players: ${playerCount}`;
+              messageContainer.appendChild(newMessage);
+            });
+
+            socket.on('playerLeft', (playerCount) => {
+              newMessage.textContent = `A player left. Current players: ${playerCount}`;
+              messageContainer.appendChild(newMessage);
+            });
+
+            socket.on('lobbyCreationFailed', (playerCount) => {
+              newMessage.textContent = 'You have already created a lobby';
+              messageContainer.appendChild(newMessage);
+            });
+
+            socket.on('lobbyJoinFailed', (playerCount) => {
+              newMessage.textContent = 'You have already joined a lobby';
+              messageContainer.appendChild(newMessage);
+            });
+
+            // socket.on('redirect', (url) => {
+            //     socket.disconnect();
+            //     window.location.href = url;
             // });
+            
         </script>
     </body>
 </html>

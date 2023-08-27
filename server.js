@@ -39,20 +39,68 @@ app.use(passport.session());
 
 app.use(flash());
 
+const rooms = {};
+const newLobbyPlayers = new Set();
+const joinLobbyPlayers = new Set();
 
 // handle websocket connections
 wsServer.on('connection', (socket) => {
-    console.log('a user just connected');
-  
-    socket.emit('message', 'Welcome to the WebSocket server!');
-    
-    socket.on('chatMessage', (message) => {
-        wsServer.emit('chatMessage', message); // broadcasting message sent to all clients/users
-    });
+  console.log('A user connected:', socket.id);
 
-    socket.on('disconnect', () => {
-      console.log('a user just disconnected');
-    });
+  socket.on('newLobby', () => {
+    if (newLobbyPlayers.has(socket.id)) {
+        socket.emit('lobbyCreationFailed');
+    } else {
+        const roomCode = shortid.generate();
+        rooms[roomCode] = { players: [socket.id], data: {} };
+        socket.join(roomCode);
+
+        newLobbyPlayers.add(socket.id);
+
+        // socket.emit('redirect', `/lobby?room=${roomCode}`);
+        socket.emit('lobbyCreated', roomCode);
+    }
+  });
+
+
+  socket.on('joinLobby', (roomCode) => {
+    if (joinLobbyPlayers.has(socket.id) || newLobbyPlayers.has(socket.id)) {
+        socket.emit('lobbyJoinFailed');
+    } else if (rooms[roomCode]) {
+        rooms[roomCode].players.push(socket.id);
+        socket.join(roomCode);
+        wsServer.to(roomCode).emit('playerJoined', rooms[roomCode].players.length);
+
+        joinLobbyPlayers.add(socket.id);
+        // socket.emit('redirect', `/lobby?room=${roomCode}`);
+
+        // if the lobby has three players, start the game automatically
+        if (rooms[roomCode].players.length === 3) {
+            // TODO: create a function / write code to start the game
+        }
+
+    } else {
+      socket.emit('lobbyNotFound');
+    }
+  });
+
+ 
+
+  socket.on('disconnect', () => {
+    console.log('A user disconnected:', socket.id);
+    for (const roomCode in rooms) {
+      const index = rooms[roomCode].players.indexOf(socket.id);
+      if (index !== -1) {
+        rooms[roomCode].players.splice(index, 1);
+        wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.length);
+        // if a lobby has 0 players, delete lobby
+        if (rooms[roomCode].players.length === 0) {
+            delete rooms[roomCode]; 
+        }
+        break;
+      }
+    }
+  });
 });
 
 
@@ -62,15 +110,15 @@ app.get("/", (req, res) => {
 
 });
 
+// ORIGINAL LOBBY CODE
 app.get("/lobby", (req, res) => {
-    const roomCode = req.query.code;
-    res.render("lobby", {roomCode: roomCode, user: {isHost: true}, users: [
+    const newRoomCode = req.query.room;
+    res.render("lobby", {roomCode: newRoomCode, user: {isHost: true}, users: [
         {name: "Ethan"},
         {name: "Naqi"},
         {name: "Fei"},
         {name: "Test"}
     ]});
-
 });
 
 app.get("/game", (req, res) => {
@@ -158,16 +206,6 @@ app.post('/register', async (req, res) => {
             throw err;
         }
     }
-});
-
-app.get("/new-game", (req, res) => {
-    const newRoomCode = shortid.generate();
-    res.redirect(`/lobby?room=${newRoomCode}`);
-});
-
-app.get("/lobby", (req, res) => {
-    const roomCode = req.query.room;
-    res.render("lobby", { roomCode });
 });
 
 app.post('/login', passport.authenticate('local', {
