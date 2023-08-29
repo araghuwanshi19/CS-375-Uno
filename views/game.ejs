@@ -1,100 +1,83 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>UNO - CS375 / Lobby</title>
-    <style>
-      body {
-        text-align: center;
-      }
-
-      #player-list {
-        width: 100%;
-        position: fixed;
-        top: 0%;
-        padding: 0px;
-      }
-      
-      #player-list li {
-        display: inline-block;
-        width: 120px;
-        margin: 0 12px 30px;
-      }
-
-      #player-list li > img {
-        border: 1px solid black;
-        text-decoration: none;
-        height: 110px;
-        background-color: aqua;
-      }
-
-      #player-list li > h3, #player-list li > p {
-        text-align: center;
-        max-width: 120px;
-        font-size: 12px;
-      }
-
-      #piles {
-        width: 100%;
-        position: fixed;
-        bottom: 50%;
-      }
-
-      #discard-pile, #draw-pile {
-        display: inline-block;
-        border: 1px solid black;
-        height: 120px;
-        width: 120px;
-      }
-
-      #hand {
-        width: 100%;
-        position: fixed;
-        bottom: 0%;
-      }
-
-      #hand-table {
-        margin-left: auto;
-        margin-right: auto;
-      }
-
-      #hand-table tr > td {
-        display: inline-block;
-        border: 1px solid black;
-        width: 120px;
-        height: 120px;
-      }
-    </style>
+    <title>UNO</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/game.css">
   </head>
   <body>
-    <div id="player-list-holder">
-      <ul id="player-list">
+    <div id="messageContainer"></div>
+    <div id="dashboard-div" <% if (state != 'dashboard') { %> style="display: none;" <% } %>>
+      <a href="/logout">Logout</a>
+
+      <h1>Hello, <span id="user"><%= user.name.charAt(0).toUpperCase() + user.name.slice(1) %></span>!</h1>
+
+      <button id="newLobbyBtn">Start New Game</button>
+
+      <ul>
+        <% if(typeof errors != 'undefined') { %> <% errors.forEach(error => { %>
+        <li><%= error.message %></li>
+        <% }) %> <% } %>
+      </ul>
+
+      <div>
+        <input id="joinInput" placeholder="Enter Room Code">
+        <button id="joinBtn">Join Room</button>
+      </div>
+    </div>
+    
+    <div id="lobby-div" <% if (state != 'lobby') { %> style="display: none;" <% } %>>
+      <h1>Lobby</h1>
+
+      <h2>Room Code: <span id="room-code"><%= roomCode %></span></h2>
+      <button id="start-button" <% if (!user.isHost) { %> style="display: none;" <% } %>>Start Game</button>
+
+      <h2>Players:</h2>
+      <ul id="lobby-player-list">
         <% users.forEach(function(user){ %>
           <li>
             <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
             <h3><%= user.name %></h3>
-            <p>Cards: <%= user.numCards %></p>
           </li>
         <% }); %>
       </ul>
     </div>
-    <div id="piles">
-      <div id="discard-pile">
-        Red Four
-      </div>
-      <div id="draw-pile">
-        Draw
-      </div>
-    </div>
-    <div id="hand">
-      <table id="hand-table">
-        <tr>
-          <% user.cards.forEach(function(card){ %>
-            <td>
-              <%= card.color %> <%= card.type %>
-            </td>
+
+    <div id="game-div" <% if (state != 'game') { %> style="display: none;" <% } %>>
+      <div id="player-list-holder">
+        <ul id="player-list">
+          <% users.forEach(function(user){ %>
+            <li>
+              <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
+              <h3><%= user.name %></h3>
+              <p>Cards: <%= user.numCards %></p>
+            </li>
           <% }); %>
-        </tr>
-      </table>
+        </ul>
+      </div>
+  
+      <div id="piles">
+        <div id="discard-pile">
+          Red Four
+        </div>
+        <div id="draw-pile">
+          Draw
+        </div>
+      </div>
+      
+      <div id="hand">
+        <table id="hand-table">
+          <tr>
+            <% user.cards.forEach(function(card){ %>
+              <td>
+                <%= card.color %> <%= card.type %>
+              </td>
+            <% }); %>
+          </tr>
+        </table>
+      </div>
     </div>
+
+    <script src="/js/game.js"></script>
   </body>
 </html>
