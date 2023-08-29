@@ -8,7 +8,7 @@ const passport = require('passport');
 const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
-const shortid = require('shortid');
+const ShortUniqueId = require('short-unique-id');
 
 const httpServer = http.createServer(app);
 const wsServer = socketIO(httpServer);
@@ -56,6 +56,8 @@ wsServer.use((socket, next) => {
 
 app.use(flash());
 
+const getNewId = new ShortUniqueId({ length: 10, dictionary: 'alphanum_upper' });
+
 const rooms = {};
 const newLobbyPlayers = new Set();
 const joinLobbyPlayers = new Set();
@@ -68,7 +70,7 @@ wsServer.on('connection', (socket) => {
     if (newLobbyPlayers.has(socket.id)) {
         socket.emit('lobbyCreationFailed');
     } else {
-        const roomCode = shortid.generate();
+        const roomCode = getNewId();
         rooms[roomCode] = { players: [[socket.request.user.name, socket.id]], data: {} };
         socket.join(roomCode);
 
