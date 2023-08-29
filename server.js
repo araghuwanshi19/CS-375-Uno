@@ -20,6 +20,8 @@ initializePassport(passport);
 const port = 3000;
 const hostname = "localhost";
 
+const {Player, Uno} = require("./game.js");
+
 app.set('view engine', 'ejs');
 
 app.use(express.urlencoded({
@@ -40,67 +42,92 @@ app.use(passport.session());
 app.use(flash());
 
 const rooms = {};
+const runningGames = {};
 const newLobbyPlayers = new Set();
 const joinLobbyPlayers = new Set();
 
 // handle websocket connections
 wsServer.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+    console.log('A user connected:', socket.id);
 
-  socket.on('newLobby', () => {
-    if (newLobbyPlayers.has(socket.id)) {
-        socket.emit('lobbyCreationFailed');
-    } else {
-        const roomCode = shortid.generate();
-        rooms[roomCode] = { players: [socket.id], data: {} };
-        socket.join(roomCode);
+    socket.on('newLobby', () => {
+        if (newLobbyPlayers.has(socket.id)) {
+            socket.emit('lobbyCreationFailed');
+        } 
+        else {
+            const roomCode = shortid.generate();
+            rooms[roomCode] = { players: [socket.id], data: {} };
+            socket.join(roomCode);
 
-        newLobbyPlayers.add(socket.id);
+            newLobbyPlayers.add(socket.id);
+            console.log(rooms)
 
-        // socket.emit('redirect', `/lobby?room=${roomCode}`);
-        socket.emit('lobbyCreated', roomCode);
-    }
-  });
+            // socket.emit('redirect', `/lobby?room=${roomCode}`);
+            socket.emit('lobbyCreated', roomCode);  
+        };
+    });
 
+    socket.on('joinLobby', (roomCode) => {
+        if (joinLobbyPlayers.has(socket.id) || newLobbyPlayers.has(socket.id)) {
+            socket.emit('lobbyJoinFailed');
+        } 
+        else if (rooms[roomCode]) {
+            rooms[roomCode].players.push(socket.id);
+            socket.join(roomCode);
+            wsServer.to(roomCode).emit('playerJoined', rooms[roomCode].players.length);
+            joinLobbyPlayers.add(socket.id);
+            // socket.emit('redirect', `/lobby?room=${roomCode}`);
 
-  socket.on('joinLobby', (roomCode) => {
-    if (joinLobbyPlayers.has(socket.id) || newLobbyPlayers.has(socket.id)) {
-        socket.emit('lobbyJoinFailed');
-    } else if (rooms[roomCode]) {
-        rooms[roomCode].players.push(socket.id);
-        socket.join(roomCode);
-        wsServer.to(roomCode).emit('playerJoined', rooms[roomCode].players.length);
+            // if the lobby has three players, start the game automatically
+            if (rooms[roomCode].players.length === 3) {
+                // TODO: create a function / write code to start the game
+                const players = createPlayers(rooms[roomCode].player);
+                const uno = new Uno(roomCode, players);
+                runningGames[roomCode] = uno;
 
-        joinLobbyPlayers.add(socket.id);
-        // socket.emit('redirect', `/lobby?room=${roomCode}`);
+                let startState = uno.start();
+            };
+        } 
+        else {
+            socket.emit('lobbyNotFound');
+        };
+    });
 
-        // if the lobby has three players, start the game automatically
-        if (rooms[roomCode].players.length === 3) {
-            // TODO: create a function / write code to start the game
-        }
+    function createPlayers(playerSockets) {
+        const players = new Map();
+        playerSockets.forEach(socketId => {
+            wsServer.to(socketId).emit('promptUsername');
 
-    } else {
-      socket.emit('lobbyNotFound');
-    }
-  });
+            socket.on('usernameEntered', (username) => {
+                const player = new Player(username, socketId);
+                players.set(socketId, player);
+            });
+        });
 
- 
+        return players;
+    };
 
-  socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
-    for (const roomCode in rooms) {
-      const index = rooms[roomCode].players.indexOf(socket.id);
-      if (index !== -1) {
-        rooms[roomCode].players.splice(index, 1);
-        wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.length);
-        // if a lobby has 0 players, delete lobby
-        if (rooms[roomCode].players.length === 0) {
-            delete rooms[roomCode]; 
-        }
-        break;
-      }
-    }
-  });
+    // socket.on('promptUsername', () => {
+    //     const username = prompt("Enter your username");
+    //     socket.emit('usernameEntered', username);
+    // });
+
+    socket.on('disconnect', () => {
+        console.log('A user disconnected:', socket.id);
+        for (const roomCode in rooms) {
+            const index = rooms[roomCode].players.indexOf(socket.id);
+            
+            if (index !== -1) {
+                rooms[roomCode].players.splice(index, 1);
+                wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.length);
+                // if a lobby has 0 players, delete lobby
+                if (rooms[roomCode].players.length === 0) {
+                    delete rooms[roomCode]; 
+                };
+                break;
+            };
+        };
+    });
 });
 
 
@@ -136,7 +163,7 @@ app.get("/game", (req, res) => {
         {name: "Fei", numCards: 1},
         {name: "Test", numCards: 4}
     ]});
-})
+});
 
 app.get("/login", checkAuthenticated, (req, res) => {
     res.render("login");
@@ -167,15 +194,15 @@ app.post('/register', async (req, res) => {
 
     if (!username || !password || !password2) {
         errors.push({message: 'Please enter all fields'});
-    }
+    };
 
     if (password.length < 6) {
         errors.push({message: "Password should be atleast 6 characters long"});
-    }
+    };
 
     if (password != password2) {
         errors.push({message: "Passwords do not match"});
-    }
+    };
 
     if(errors.length > 0) {
         res.render('register', {errors});
@@ -183,29 +210,29 @@ app.post('/register', async (req, res) => {
         try{ 
             // validation passed
             let hashpassword = await argon2.hash(password);
-            
             const results = await pool.query(
                 `SELECT * FROM users WHERE name = $1`, [username]
             );
         
-        
             if (results.rows.length > 0) {
                 errors.push({ message: "Username already in use" });
                 res.render('register', { errors });
-            } else {
+            } 
+            else {
                 pool.query(`INSERT INTO users (name, password) VALUES ($1, $2) RETURNING id, password`, [username, hashpassword], (err, results) => {
                     if (err) {
                         throw err;
                     }
                     req.flash('success_message', 'Your account has been registered. Please log in');
                     res.redirect('/login');
-                })
-            }
-        } catch (err) {
+                });
+            };
+        } 
+        catch (err) {
             // handle errors
             throw err;
-        }
-    }
+        };
+    };
 });
 
 app.post('/login', passport.authenticate('local', {

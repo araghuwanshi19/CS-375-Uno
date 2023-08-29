@@ -1,31 +1,81 @@
 const readline = require("readline");
 
-const types = ["normal-card", "action-card", "wild-card"];
-const actions = ["draw-two", "reverse", "skip"];
-const wild_actions = ["draw-four", "change-color"];
-const colors = ["red", "blue", "green", "yellow"];
-const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+class Player {
+    constructor(name, socket) {
+        this.hand = [];
+        this.name = name;
+        this.socket = socket;
+    };
+
+    addToHand(card) {
+        this.hand.push(card);
+    };
+};
+
 
 class Uno {
-    constructor() {
-        this.deck = [];
+    constructor(code, players) {
+        this.code = code
+        this.deck = this.createDeck();
         this.discard = [];
-        this.players = new Map();
-        this.playerNames = [];
+        this.players = players;
+
+        this.skipNext = false;
         this.topColor = "";
         this.topNumber = 0;
+
+        this.actions = ["draw-two", "reverse", "skip"];
+        this.wild_actions = ["draw-four", "change-color"];
+        this.colors = ["red", "blue", "green", "yellow"];
+        this.numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
         this.rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
-        });
+        });  
+    };
 
-        this.skipNext = false;
+    getState() {
+        return {
+            deck: this.deck,
+            discard: this.discard,
+            players: this.players,
+            currentColor: this.currentColor,
+            currentNumber: this.currentNumber,
+        };
     };
 
     getUserInput(question) {
         return new Promise(resolve => {
             this.rl.question(question, resolve);
         });
+    };
+
+    createDeck() {
+        const deck = [];
+        for (const color of this.colors) {
+            // Create the normal cards
+            deck.push({type: "normal-card", color: color, number: 0});
+            for (const number of this.numbers) {
+                deck.push({type: "normal-card", color: color, number: number});
+                deck.push({type: "normal-card", color: color, number: number});
+            };
+
+            // Create the action cards
+            for (const action of this.actions) {
+                deck.push({type: "action-card", color: color, action: action});
+                deck.push({type: "action-card", color: color, action: action});
+            };
+        };
+        
+        // Create the wild cards
+        for (let i = 0; i < 4; i++) {
+            for (const action of this.wild_actions)
+            deck.push({type: "wild-card", color: "black", action: action});
+        };
+
+        return deck;
     };
 
     displayCards(listOfCards) {
@@ -74,32 +124,9 @@ class Uno {
         console.log(cardArt);
     };
 
-    createDeck() {
-        for (const color of colors) {
-            // Create the normal cards
-            this.deck.push({type: "normal-card", color: color, number: 0});
-            for (const number of numbers) {
-                this.deck.push({type: "normal-card", color: color, number: number});
-                this.deck.push({type: "normal-card", color: color, number: number});
-            };
-
-            // Create the action cards
-            for (const action of actions) {
-                this.deck.push({type: "action-card", color: color, action: action});
-                this.deck.push({type: "action-card", color: color, action: action});
-            };
-        };
-        
-        // Create the wild cards
-        for (let i = 0; i < 4; i++) {
-            for (const action of wild_actions)
-            this.deck.push({type: "wild-card", color: "black", action: action});
-        };
-    };
-
     dealCards() {
         for (let i = 0; i < 7; i++) {
-            for (const [key, value] of this.players) {
+            for (const player of this.players) {
                 this.drawCard(key);
             };
         };
@@ -150,36 +177,6 @@ class Uno {
             const j = Math.floor(Math.random() * (i + 1));
             [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
         };
-    };
-
-    setup(callback) {
-        const minPlayers = 2;
-        const maxPlayers = 10;
-        
-        const promptForPlayerName = () => {
-            this.rl.question("Enter player name (or press Enter to start the game): ", playerName => {
-                if (!playerName ||  this.players.size >= maxPlayers) {
-                    if (this.players.size >= minPlayers) {
-                        //this.rl.close();
-                        this.createDeck();
-                        this.displayCards(this.deck);
-                        this.shuffle();
-                        this.dealCards();
-                        console.log(this.players);
-                        callback();
-                    } else {
-                        console.log("Minimum number of players not met.");
-                        promptForPlayerName();
-                    };
-                } else {
-                    this.players.set(playerName, []);
-                    this.playerNames.push(playerName);
-                    promptForPlayerName();
-                };
-            });
-        };
-
-        promptForPlayerName();
     };
 
     async gameLoop() {
@@ -281,7 +278,7 @@ class Uno {
         }
         else {
             this.rl.question("Choose the next color (red, blue, green, yellow)", (color) => {
-                if (!colors.includes(color)) {
+                if (!this.colors.includes(color)) {
                     console.log("That is not a valid color, please choose another.");
                     this.doWildAction(card);
                 }
@@ -328,6 +325,10 @@ class Uno {
 
         return true;
     };
+
+    isValidPlayer(player) {
+        const s = 0;
+    };
     
     isValidCard(choice, player) {
         const cardIndex = parseInt(choice);
@@ -335,7 +336,7 @@ class Uno {
             return false;
         };
 
-        const playerCards =  this.players.get(player);
+        const playerCards = this.players.get(player);
         const playerCard = playerCards[cardIndex];
         if (!(0 <= cardIndex && cardIndex < playerCards.length)) {
             return false;
@@ -354,12 +355,16 @@ class Uno {
 
     start() {
         this.setup(() => {
+            this.shuffle();
+            this.dealCards();
             this.drawFirst();
-            this.gameLoop();
+            return this.getState();
         });
     };
 };
 
 
-const uno = new Uno();
-uno.start();
+module.exports = {
+    Player,
+    Uno
+};
