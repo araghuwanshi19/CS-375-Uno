@@ -86,54 +86,19 @@ class Uno {
     };
 
     displayCard(card) {
-        let color = "";
-        let content = "";
-        if (this.isNormalCard(card)) {
-            color = card.color;
-            content = card.number.toString();
-        }
-        else if (this.isActionCard(card)) {
-            color = card.color;
-            content = card.action;
-        }
-        else {
-            color = "black";
-            content = card.action;
-        };
-
-        const maxContentLength = Math.max(color.length, content.length);
-        const cardWidth = maxContentLength + 4;  // Adjust the card width as needed
-        const colorPadding = ' '.repeat(Math.floor((cardWidth - color.length) / 2));
-        const contentPadding = ' '.repeat(Math.floor((cardWidth - content.length) / 2));
-
-        // Ensure even padding on both sides
-        const remainingColorPadding = cardWidth - color.length - colorPadding.length;
-        const remainingContentPadding = cardWidth - content.length - contentPadding.length;
-
-        const cardArt = `
-            +${'-'.repeat(cardWidth - 2)}+
-            |${' '.repeat(cardWidth - 2)}|
-            |${colorPadding}${color}${' '.repeat(remainingColorPadding)}|
-            |${' '.repeat(cardWidth - 2)}|
-            |${contentPadding}${content}${' '.repeat(remainingContentPadding)}|
-            |${' '.repeat(cardWidth - 2)}|
-            |${' '.repeat(cardWidth - 2)}|
-            +${'-'.repeat(cardWidth - 2)}+
-        `;
-
-        console.log(cardArt);
+        console.log(card)
     };
 
     dealCards() {
         for (let i = 0; i < 7; i++) {
-            for (const player of this.players) {
-                this.drawCard(key);
+            for (const [key, value] of this.players) {
+                this.drawCard(player);
             };
         };
     };
 
-    drawCard(player) {
-        this.players.get(player).push(this.deck.pop());
+    drawCard(playerId) {
+        this.players.get(playerId).push(this.deck.pop());
     };
 
     drawFirst() {
@@ -179,8 +144,13 @@ class Uno {
         };
     };
 
+    takeTurn(playerSocketId) {
+        const currentPlayer = this.players.get(playerSocketId);
+
+        
+    }
+
     async gameLoop() {
-        console.log("Welcome to UNO!")
         while (true) {
             for (const name of this.playerNames) {
                 if (this.skipNext) {
@@ -324,10 +294,6 @@ class Uno {
         };
 
         return true;
-    };
-
-    isValidPlayer(player) {
-        const s = 0;
     };
     
     isValidCard(choice, player) {

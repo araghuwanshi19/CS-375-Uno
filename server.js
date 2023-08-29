@@ -85,7 +85,8 @@ wsServer.on('connection', (socket) => {
                 const uno = new Uno(roomCode, players);
                 runningGames[roomCode] = uno;
 
-                let startState = uno.start();
+                let gameStartState = uno.start();
+                
             };
         } 
         else {
@@ -107,10 +108,10 @@ wsServer.on('connection', (socket) => {
         return players;
     };
 
-    // socket.on('promptUsername', () => {
-    //     const username = prompt("Enter your username");
-    //     socket.emit('usernameEntered', username);
-    // });
+    socket.on('promptUsername', () => {
+        const username = prompt("Enter your username");
+        socket.emit('usernameEntered', username);
+    });
 
     socket.on('disconnect', () => {
         console.log('A user disconnected:', socket.id);
@@ -134,7 +135,6 @@ wsServer.on('connection', (socket) => {
 // serve the login.html file at the root path
 app.get("/", (req, res) => {
     res.render("index");
-
 });
 
 // ORIGINAL LOBBY CODE
