@@ -13,12 +13,26 @@ const players = new Map();
 let skipNext = false;
 let clockwiseOrder = true;
 
-
 /**
  * Creates the starting deck for the game - will always look the same until it's shuffled
  * @returns A list of dictionaries: each card is represented by a dictionary
  */
 // Functions for game starting and ending processes
+
+function begin(code, playerIds) {
+    roomCode = code;
+
+    playerIds.forEach(id => {
+        players[id] = [];
+    });
+
+    shuffle();
+
+    return getBeginState();
+};
+
+
+
 function createStartDeck() {
     const deck = [];
 
@@ -67,10 +81,6 @@ function putDiscardToDeck() {
     shuffle();
 };
 
-function getFirstPlayer() {
-    return players.keys.next().value;
-}
-
 // Game state functions
 function getBeginState() {
     return {
@@ -85,6 +95,11 @@ function getBeginState() {
     };
 };
 
+function getFirstPlayer() {
+    return players.keys.next().value;
+};
+
+
 function getPlayerWonGameState(playerId) {
     return {
         deck: deck,
@@ -93,7 +108,7 @@ function getPlayerWonGameState(playerId) {
     };
 };
 
-function getNormalCardnGameState(playerId, move) {
+function getNormalCardGameState(playerId, move) {
     return {
         deck: deck,
         discard: discard,
@@ -102,12 +117,10 @@ function getNormalCardnGameState(playerId, move) {
         players: players,
         currentColor: currentColor,
         currentNumber: currentNumber,
-        clockwiseOrder: clockwiseOrder,
-        skipNext: skipNext,
     };
 };
 
-function getDrawTwoActionCardGameState(currentPlayerId, drawCardPlayerId) {
+function getDrawTwoActionGameState(currentPlayerId, drawCardPlayerId) {
     return {
         deck: deck,
         discard: discard,
@@ -117,12 +130,10 @@ function getDrawTwoActionCardGameState(currentPlayerId, drawCardPlayerId) {
         players: players,
         currentColor: currentColor,
         currentNumber: currentNumber,
-        clockwiseOrder: clockwiseOrder,
-        skipNext: skipNext,
     };
 };
 
-function getDrawFourActionCardGameState(currentPlayerId, drawCardPlayerId) {
+function getDrawFourActionGameState(currentPlayerId, drawCardPlayerId) {
     return {
         deck: deck,
         discard: discard,
@@ -132,23 +143,31 @@ function getDrawFourActionCardGameState(currentPlayerId, drawCardPlayerId) {
         players: players,
         currentColor: currentColor,
         currentNumber: currentNumber,
-        clockwiseOrder: clockwiseOrder,
-        skipNext: skipNext,
     };
 };
 
-function getColorChangeCardGameState(currentPlayerId) {
+function getColorChangeGameState(playerId) {
     return {
         deck: deck,
         discard: discard,
-        currentPlayer: currentPlayerId,
+        currentPlayer: playerId,
         move: "change-color",
-        numCards: numCards,
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+    };
+};
+
+function getReverseOrderGameState(playerId, move) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: playerId,
+        move: "reverse",
         players: players,
         currentColor: currentColor,
         currentNumber: currentNumber,
         clockwiseOrder: clockwiseOrder,
-        skipNext: skipNext,
     };
 };
 
@@ -237,7 +256,7 @@ function discard(playerId, cardMove) {
 
 // Functionality for potential special cards
 function reverseTurnOrder() {
-
+    clockwiseOrder = !clockwiseOrder;
 };
 
 
