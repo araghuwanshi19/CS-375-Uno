@@ -1,8 +1,7 @@
 const socket = io();
 
 // Message div
-const messageContainer = document.getElementById('messageContainer');
-let newMessage = document.createElement('p');
+const messageContainer = document.getElementById('message-container');
 
 // Other top-level divs
 const dashDiv = document.getElementById('dashboard-div');
@@ -28,9 +27,13 @@ const handTable = document.getElementById('hand-table');
 
 // Helper functions
 function showMessage(msg) {
-  messageContainer.innerText = "";
+  let newMessage = document.createElement('div');
+  newMessage.classList.add("message");
   newMessage.textContent = msg;
-  messageContainer.appendChild(newMessage);
+  messageContainer.insertBefore(newMessage, messageContainer.firstChild);
+  setTimeout(() => {
+    messageContainer.removeChild(newMessage);
+  }, 3000);
 }
 
 function titleCase(username) {
@@ -105,11 +108,13 @@ socket.on('startGame', () => {
   showMessage('The game has begun!');
 })
 
-socket.on('playerJoined', (roomCode, players) => {
+socket.on('playerJoined', (roomCode, newPlayer, players) => {
   refreshPlayers(players);
-  dashDiv.style.display = 'none';
-  roomCodeSpan.textContent = roomCode;
-  lobbyDiv.style.display = null;
+  if (currentPlayer == newPlayer) {
+    dashDiv.style.display = 'none';
+    roomCodeSpan.textContent = roomCode;
+    lobbyDiv.style.display = null;
+  }
   showMessage(`A player joined. Current players: ${players.length}`);
 });
 

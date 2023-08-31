@@ -83,12 +83,13 @@ wsServer.on('connection', (socket) => {
 
 
   socket.on('joinLobby', (roomCode) => {
+    let currentPlayer = socket.request.user.name;
     if (joinLobbyPlayers.has(socket.id) || newLobbyPlayers.has(socket.id)) {
         socket.emit('lobbyJoinFailed');
     } else if (rooms[roomCode]) {
-        rooms[roomCode].players.push([socket.request.user.name, socket.id]);
+        rooms[roomCode].players.push([currentPlayer, socket.id]);
         socket.join(roomCode);
-        wsServer.to(roomCode).emit('playerJoined', roomCode, rooms[roomCode].players.map(x => x[0]));
+        wsServer.to(roomCode).emit('playerJoined', roomCode, currentPlayer, rooms[roomCode].players.map(x => x[0]));
 
         joinLobbyPlayers.add(socket.id);
         // socket.emit('redirect', `/lobby?room=${roomCode}`);

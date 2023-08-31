@@ -4,6 +4,38 @@ body.game {
   height: 100vh;
 }
 
+#message-container {
+  position: fixed;
+  width: 300px;
+  top: 20%;
+  right: 10px;
+  height: 60%;
+  display: flex;
+  row-gap: 10px;
+  flex-direction: column;
+}
+
+.message {
+  min-width: 250px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 5px;
+  padding: 16px;
+  -webkit-animation: fadeout 0.5s 2.5s;
+  animation: fadeout 0.5s 2.5s;
+}
+
+@-webkit-keyframes fadeout {
+  from {opacity: 1;} 
+  to {opacity: 0;}
+}
+
+@keyframes fadeout {
+  from {opacity: 1;}
+  to {opacity: 0;}
+}
+
 #lobby-div {
   margin-top: 8rem;
   text-align: center;

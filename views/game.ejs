@@ -4,21 +4,19 @@
     <title>UNO</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" type="text/css" href="css/game.css">
+    <script>
+      const currentPlayer = "<%= user.name %>";
+    </script>
   </head>
   <body>
-    <div id="messageContainer"></div>
+    <div id="message-container"></div>
+
     <div id="dashboard-div" <% if (state != 'dashboard') { %> style="display: none;" <% } %>>
       <a href="/logout">Logout</a>
 
       <h1>Hello, <span id="user"><%= user.name.charAt(0).toUpperCase() + user.name.slice(1) %></span>!</h1>
 
       <button id="newLobbyBtn">Start New Game</button>
-
-      <ul>
-        <% if(typeof errors != 'undefined') { %> <% errors.forEach(error => { %>
-        <li><%= error.message %></li>
-        <% }) %> <% } %>
-      </ul>
 
       <div>
         <input id="joinInput" placeholder="Enter Room Code">
