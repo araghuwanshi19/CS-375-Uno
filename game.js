@@ -8,7 +8,7 @@ const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 // Stuff specific to a game
 let roomCode = "";
 const deck = createStartDeck();
-const discard = [];
+const discardPile = [];
 const players = new Map();
 let skipNext = false;
 let clockwiseOrder = true;
@@ -23,7 +23,8 @@ function begin(code, playerIds) {
     });
 
     shuffle();
-    return getBeginState();
+    dealCards();
+    return getBeginState(getFirstPlayer());
 };
 
 function createStartDeck() {
@@ -46,7 +47,7 @@ function createStartDeck() {
     
     // Create the wild cards, four of each action
     for (let i = 0; i < 4; i++) {
-        for (const action of this.wild_actions)
+        for (const action of wild_actions)
         deck.push({type: "wild-card", color: "black", action: action});
     };
 
@@ -69,27 +70,30 @@ function dealCards() {
 };
 
 function putDiscardToDeck() {
-    deck = discard;
-    discard = [];
+    let topCard = discardPile.pop();
+    deck = discardPile;
+    discardPile = [topCard];
     shuffle();
 };
 
 // Game state functions
-function getBeginState() {
+function getBeginState(firstPlayer) {
+    let topCard = deck.shift();
     return {
+        roomCode: roomCode,
         deck: deck,
-        discard: [],
+        discardPile: [topCard],
         players: players,
-        currentPlayer: getFirstPlayer(),
-        currentColor: currentColor,
-        currentNumber: currentNumber,
+        currentPlayer: firstPlayer,
+        currentColor: topCard.color,
+        currentNumber: topCard.number,
         clockwiseOrder: true,
         skipNext: false,
     };
 };
 
 function getFirstPlayer() {
-    return players.keys.next().value;
+    return Object.keys(players)[0];
 };
 
 function getPlayerWonGameState(playerId) {
@@ -101,7 +105,7 @@ function getPlayerWonGameState(playerId) {
 function getRestartGameState(playerId) {
     return {
         deck: deck,
-        discard: discard,
+        discard: discardPile,
         currentPlayer: playerId,
         move: move,
         players: players,
@@ -121,7 +125,7 @@ function getPlayerDrewCardGameState(playerId, card) {
 function getNormalCardGameState(playerId, move) {
     return {
         deck: deck,
-        discard: discard,
+        discard: discardPile,
         currentPlayer: playerId,
         move: move,
         players: players,
@@ -133,7 +137,7 @@ function getNormalCardGameState(playerId, move) {
 function getSkipCardGameState(playerId) {
     return {
         deck: deck,
-        discard: discard,
+        discard: discardPile,
         currentPlayer: playerId,
         move: "skip",
         skipNext: skipNext,
@@ -145,7 +149,7 @@ function getSkipCardGameState(playerId) {
 function getDrawCardsActionGameState(currentPlayerId, numCards) {
     return {
         deck: deck,
-        discard: discard,
+        discard: discardPile,
         currentPlayer: currentPlayerId,
         move: "draw",
         numCardsToDraw: numCards,
@@ -159,7 +163,7 @@ function getDrawCardsActionGameState(currentPlayerId, numCards) {
 function getColorChangeGameState(playerId) {
     return {
         deck: deck,
-        discard: discard,
+        discard: discardPile,
         currentPlayer: playerId,
         move: "change-color",
         players: players,
@@ -171,7 +175,7 @@ function getColorChangeGameState(playerId) {
 function getReverseOrderGameState(playerId) {
     return {
         deck: deck,
-        discard: discard,
+        discard: discardPile,
         currentPlayer: playerId,
         move: "reverse",
         players: players,
@@ -217,16 +221,12 @@ function isChangeColorCard(card) {
 
 
 // Game actions for players
-function drawTwo(playerId) {
-    for (let i = 0; i < 2; i++) {
+function drawCards(playerId, numCards) {
+    for (let i = 0; i < numCards; i++) {
         drawCard(playerId);
     };
-};
 
-function drawFour(playerId) {
-    for (let i = 0; i < 4; i++) {
-        drawCard(playerId);
-    };
+    return getDrawCardsActionGameState(playerId, numCards);
 };
 
 function drawCard(playerId) {
@@ -304,7 +304,7 @@ function doCardAction(playerId, card) {
             return state;
         };
     }
-    else {
+    else  if (isNormalCard(card)){
         return getNormalCardGameState(playerId, move);
     };
 };
@@ -320,4 +320,18 @@ function reverseTurnOrder(playerId) {
     players = reversedPlayers;
     clockwiseOrder = !clockwiseOrder;
     return getReverseOrderGameState(playerId);
+};
+
+
+module.exports = {
+    begin,
+    doTurn,
+    getPlayerWonGameState,
+    getRestartGameState,
+    getPlayerDrewCardGameState,
+    getNormalCardGameState,
+    getSkipCardGameState,
+    getDrawCardsActionGameState,
+    getColorChangeGameState,
+    getReverseOrderGameState
 };
