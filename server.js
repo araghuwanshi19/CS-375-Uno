@@ -8,7 +8,7 @@ const passport = require('passport');
 const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
-const shortid = require('shortid');
+const ShortUniqueId = require('short-unique-id');
 
 const httpServer = http.createServer(app);
 const wsServer = socketIO(httpServer);
@@ -18,7 +18,6 @@ const initializePassport = require('./passportConfig');
 initializePassport(passport);
 
 const port = 3000;
-const hostname = "localhost";
 
 app.set('view engine', 'ejs');
 
@@ -28,16 +27,36 @@ app.use(express.urlencoded({
 
 app.use(express.static(path.join(__dirname, "static")));
 
-app.use(session({
-    secret: 'secret',
+const sessionMiddleware = session({
+    secret: process.env.SECRET_KEY,
     resave: false,
     saveUninitialized: false
-}));
+});
 
+app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Add middleware wrap for SocketIO
+const wrap = middleware => (socket, next) => middleware(socket.request, {}, next);
+
+// Add auth to websockets
+wsServer.use(wrap(sessionMiddleware));
+wsServer.use(wrap(passport.initialize()));
+wsServer.use(wrap(passport.session()));
+
+// Tell websocket to only connect if authorized
+wsServer.use((socket, next) => {
+    if (socket.request.user) {
+        next();
+    } else {
+        next(new Error('unauthorized'))
+    }
+});
+
 app.use(flash());
+
+const getNewId = new ShortUniqueId({ length: 10, dictionary: 'alphanum_upper' });
 
 const rooms = {};
 const newLobbyPlayers = new Set();
@@ -45,31 +64,32 @@ const joinLobbyPlayers = new Set();
 
 // handle websocket connections
 wsServer.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  console.log('A user connected:', socket.request.user.name, socket.id);
 
   socket.on('newLobby', () => {
     if (newLobbyPlayers.has(socket.id)) {
         socket.emit('lobbyCreationFailed');
     } else {
-        const roomCode = shortid.generate();
-        rooms[roomCode] = { players: [socket.id], data: {} };
+        const roomCode = getNewId();
+        rooms[roomCode] = { players: [[socket.request.user.name, socket.id]], data: {} };
         socket.join(roomCode);
 
         newLobbyPlayers.add(socket.id);
 
         // socket.emit('redirect', `/lobby?room=${roomCode}`);
-        socket.emit('lobbyCreated', roomCode);
+        socket.emit('lobbyCreated', roomCode, socket.request.user.name);
     }
   });
 
 
   socket.on('joinLobby', (roomCode) => {
+    let currentPlayer = socket.request.user.name;
     if (joinLobbyPlayers.has(socket.id) || newLobbyPlayers.has(socket.id)) {
         socket.emit('lobbyJoinFailed');
     } else if (rooms[roomCode]) {
-        rooms[roomCode].players.push(socket.id);
+        rooms[roomCode].players.push([currentPlayer, socket.id]);
         socket.join(roomCode);
-        wsServer.to(roomCode).emit('playerJoined', rooms[roomCode].players.length);
+        wsServer.to(roomCode).emit('playerJoined', roomCode, currentPlayer, rooms[roomCode].players.map(x => x[0]));
 
         joinLobbyPlayers.add(socket.id);
         // socket.emit('redirect', `/lobby?room=${roomCode}`);
@@ -84,15 +104,23 @@ wsServer.on('connection', (socket) => {
     }
   });
 
- 
+  socket.on('startGame', (roomCode) => {
+    if (!rooms[roomCode] || rooms[roomCode].players[0][1] != socket.id) {
+        return;
+    }
+
+    wsServer.to(roomCode).emit('startGame');
+  });
 
   socket.on('disconnect', () => {
     console.log('A user disconnected:', socket.id);
     for (const roomCode in rooms) {
-      const index = rooms[roomCode].players.indexOf(socket.id);
+      const index = rooms[roomCode].players.map(x => x[1]).indexOf(socket.id);
       if (index !== -1) {
+        console.log(rooms[roomCode].players)
         rooms[roomCode].players.splice(index, 1);
-        wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.length);
+        console.log(rooms[roomCode].players)
+        wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.map(x => x[0]));
         // if a lobby has 0 players, delete lobby
         if (rooms[roomCode].players.length === 0) {
             delete rooms[roomCode]; 
@@ -110,32 +138,26 @@ app.get("/", (req, res) => {
 
 });
 
-// ORIGINAL LOBBY CODE
-app.get("/lobby", (req, res) => {
-    const newRoomCode = req.query.room;
-    res.render("lobby", {roomCode: newRoomCode, user: {isHost: true}, users: [
-        {name: "Ethan"},
-        {name: "Naqi"},
-        {name: "Fei"},
-        {name: "Test"}
-    ]});
-});
-
-app.get("/game", (req, res) => {
-    res.render("game", {user: {cards: [
-        {color: "red", type: "four"},
-        {color: "green", type: "four"},
-        {color: "blue", type: "four"},
-        {color: "yellow", type: "four"},
-        {color: "red", type: "reverse"},
-        {color: "blue", type: "skip"},
-        {color: "red", type: "+2"},
-    ]}, users: [
-        {name: "Ethan", numCards: 2},
-        {name: "Naqi", numCards: 5},
-        {name: "Fei", numCards: 1},
-        {name: "Test", numCards: 4}
-    ]});
+app.get("/game", checkNotAuthenticated, (req, res) => {
+    const state = {
+        state: "dashboard",
+        roomCode: "",
+        user: {
+            name: req.user.name,
+            isHost: false,
+            cards: [
+                {color: "red", type: "four"},
+                {color: "green", type: "four"},
+                {color: "blue", type: "four"},
+                {color: "yellow", type: "four"},
+                {color: "red", type: "reverse"},
+                {color: "blue", type: "skip"},
+                {color: "red", type: "+2"},
+            ]
+        },
+        users: []
+    }
+    return res.render("game", state)
 })
 
 app.get("/login", checkAuthenticated, (req, res) => {
@@ -145,11 +167,6 @@ app.get("/login", checkAuthenticated, (req, res) => {
 
 app.get("/register", checkAuthenticated, (req, res) => {
     res.render("register");
-
-});
-
-app.get("/dashboard", checkNotAuthenticated, (req, res) => {
-    res.render("dashboard", {user: req.user.name});
 
 });
 
@@ -209,14 +226,14 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/login', passport.authenticate('local', {
-    successRedirect: '/dashboard',
+    successRedirect: '/game',
     failureRedirect: '/login',
     failureFlash: true,
 }));
 
 function checkAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
-        return res.redirect('/dashboard');
+        return res.redirect('/game');
     }
     next();
 }
