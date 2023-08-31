@@ -319,6 +319,5 @@ function reverseTurnOrder(playerId) {
 
     players = reversedPlayers;
     clockwiseOrder = !clockwiseOrder;
-
     return getReverseOrderGameState(playerId);
 };
