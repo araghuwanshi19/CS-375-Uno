@@ -1,365 +1,321 @@
-const readline = require("readline");
-
-const types = ["normal-card", "action-card", "wild-card"];
-const actions = ["draw-two", "reverse", "skip"];
+// Used for card data and types
+const actions = ["draw-two", "reverse", "skip-turn"];
 const wild_actions = ["draw-four", "change-color"];
 const colors = ["red", "blue", "green", "yellow"];
 const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-class Uno {
-    constructor() {
-        this.deck = [];
-        this.discard = [];
-        this.players = new Map();
-        this.playerNames = [];
-        this.topColor = "";
-        this.topNumber = 0;
-        this.rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
 
-        this.skipNext = false;
-    };
+// Stuff specific to a game
+let roomCode = "";
+const deck = createStartDeck();
+const discard = [];
+const players = new Map();
+let skipNext = false;
+let clockwiseOrder = true;
 
-    getUserInput(question) {
-        return new Promise(resolve => {
-            this.rl.question(question, resolve);
-        });
-    };
 
-    displayCards(listOfCards) {
-        console.log(listOfCards.length);
-        for (const card of listOfCards) {
-            this.displayCard(card);
-        };
-    };
+// Functions for game starting and ending processes
+function begin(code, playerIds) {
+    roomCode = code;
 
-    displayCard(card) {
-        let color = "";
-        let content = "";
-        if (this.isNormalCard(card)) {
-            color = card.color;
-            content = card.number.toString();
-        }
-        else if (this.isActionCard(card)) {
-            color = card.color;
-            content = card.action;
-        }
-        else {
-            color = "black";
-            content = card.action;
+    playerIds.forEach(id => {
+        players[id] = [];
+    });
+
+    shuffle();
+
+    return getBeginState();
+};
+
+function createStartDeck() {
+    const deck = [];
+
+    for (const color of colors) {
+        // Create the normal cards, two of each number from 1-9 and one 0, for each color.
+        deck.push({type: "normal-card", color: color, number: 0});
+        for (const number of numbers) {
+            deck.push({type: "normal-card", color: color, number: number});
+            deck.push({type: "normal-card", color: color, number: number});
         };
 
-        const maxContentLength = Math.max(color.length, content.length);
-        const cardWidth = maxContentLength + 4;  // Adjust the card width as needed
-        const colorPadding = ' '.repeat(Math.floor((cardWidth - color.length) / 2));
-        const contentPadding = ' '.repeat(Math.floor((cardWidth - content.length) / 2));
-
-        // Ensure even padding on both sides
-        const remainingColorPadding = cardWidth - color.length - colorPadding.length;
-        const remainingContentPadding = cardWidth - content.length - contentPadding.length;
-
-        const cardArt = `
-            +${'-'.repeat(cardWidth - 2)}+
-            |${' '.repeat(cardWidth - 2)}|
-            |${colorPadding}${color}${' '.repeat(remainingColorPadding)}|
-            |${' '.repeat(cardWidth - 2)}|
-            |${contentPadding}${content}${' '.repeat(remainingContentPadding)}|
-            |${' '.repeat(cardWidth - 2)}|
-            |${' '.repeat(cardWidth - 2)}|
-            +${'-'.repeat(cardWidth - 2)}+
-        `;
-
-        console.log(cardArt);
-    };
-
-    createDeck() {
-        for (const color of colors) {
-            // Create the normal cards
-            this.deck.push({type: "normal-card", color: color, number: 0});
-            for (const number of numbers) {
-                this.deck.push({type: "normal-card", color: color, number: number});
-                this.deck.push({type: "normal-card", color: color, number: number});
-            };
-
-            // Create the action cards
-            for (const action of actions) {
-                this.deck.push({type: "action-card", color: color, action: action});
-                this.deck.push({type: "action-card", color: color, action: action});
-            };
+        // Create the action cards, two of each action, for each color
+        for (const action of actions) {
+            deck.push({type: "action-card", color: color, action: action});
+            deck.push({type: "action-card", color: color, action: action});
         };
-        
-        // Create the wild cards
-        for (let i = 0; i < 4; i++) {
-            for (const action of wild_actions)
-            this.deck.push({type: "wild-card", color: "black", action: action});
-        };
-    };
-
-    dealCards() {
-        for (let i = 0; i < 7; i++) {
-            for (const [key, value] of this.players) {
-                this.drawCard(key);
-            };
-        };
-    };
-
-    drawCard(player) {
-        this.players.get(player).push(this.deck.pop());
-    };
-
-    drawFirst() {
-        const first = this.deck.pop();
-        console.log("The first card is...");
-        this.displayCard(first);
-
-        if (this.isNormalCard(first)) {
-            this.topColor = first.color;
-            this.topNumber = first.number;
-        }
-        else if (this.isActionCard(first)) {
-            this.topColor = first.color;
-            this.doAction(first);
-        };
-        
-        this.discard.push(first);
-    };
-
-    drawFour(player) {
-        for (let i = 0; i < 4; i++) {
-            this.drawCard(player);
-        };
-    };
-
-    peekDiscard() {
-        return this.discard[this.discard.length - 1];
-    };
-
-    peekPlayerDeck(player) {
-        return this.players.get(player);
-    };
-
-    placeCard(player, card) {
-        player.remove(card);
-        this.discard.push(card);
-    };
-
-    shuffle() {
-        for (let i = this.deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
-        };
-    };
-
-    setup(callback) {
-        const minPlayers = 2;
-        const maxPlayers = 10;
-        
-        const promptForPlayerName = () => {
-            this.rl.question("Enter player name (or press Enter to start the game): ", playerName => {
-                if (!playerName ||  this.players.size >= maxPlayers) {
-                    if (this.players.size >= minPlayers) {
-                        //this.rl.close();
-                        this.createDeck();
-                        this.displayCards(this.deck);
-                        this.shuffle();
-                        this.dealCards();
-                        console.log(this.players);
-                        callback();
-                    } else {
-                        console.log("Minimum number of players not met.");
-                        promptForPlayerName();
-                    };
-                } else {
-                    this.players.set(playerName, []);
-                    this.playerNames.push(playerName);
-                    promptForPlayerName();
-                };
-            });
-        };
-
-        promptForPlayerName();
-    };
-
-    async gameLoop() {
-        console.log("Welcome to UNO!")
-        while (true) {
-            for (const name of this.playerNames) {
-                if (this.skipNext) {
-                    console.log(`Skipping player ${name}'s turn`);
-                    this.skipNext = false;
-                    continue;
-                };
-
-                console.log("Match the current card =>\n");
-                this.displayCard(this.discard.get(-1));
-
-                console.log(`It is player ${name}'s turn!`);
-                const choice = await this.promptForPlayerCard(name);
-                const played = this.players.get(name)[choice];
-                
-                if (this.isActionCard(played)) {
-                    this.doAction(played);
-                }
-                else if (this.isWildCard(played)) {
-                    this.doWildAction(played);
-                }
-                else {
-                    this.topColor = played["color"];
-                    this.topNumber = played["number"];
-                };
-            };
-        };
-    };
-
-    isGameOver(player) {
-        if (this.deck.length === 0) {
-            console.log("The deck is out of cards!");
-            return true;
-        };
-
-        if (this.players[player].length === 0) {
-            console.log(`Player ${player} has no cards, they win!`);
-            return true;
-        };
-
-        return false;
-    };
-
-    isNormalCard(card) {
-        return (card.type === "normal-card");
-    };
-
-    isActionCard(card) {
-        return (card.type === "action-card");
     };
     
-    doAction(card) {
-        if (card.action === "draw-two") {
-            this.rl.question("Select a player to draw two", (player) => {
-                if (!this.playerNames.includes(player)) {
-                    console.log("The player is not in the game, please choose another.");
-                    this.doWildAction(card);
-                }
-                else {
-                    console.log(`Player ${player}, has to draw four cards!`);
-                    this.drawFour(player);
-                };
-            });
-        }
-        else if (card.action === "skip"){
-            console.log("Skipping next player's turn.");
-            this.skipNext = true;
-        }
-        else {
-            this.players = this.reverseTurnOrder();
-        };
+    // Create the wild cards, four of each action
+    for (let i = 0; i < 4; i++) {
+        for (const action of this.wild_actions)
+        deck.push({type: "wild-card", color: "black", action: action});
     };
 
-    reverseTurnOrder() {
-        const reversedEntries = Array.from(this.players.entries()).reverse();
-        return new Map(reversedEntries);
+    return deck;
+};
+
+function shuffle() {
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
     };
+};
 
-    isWildCard(card) {
-        return (card.type === "wild-card");
-    };
-
-    doWildAction(card) {
-        if (card.action === "draw-four") {
-            this.rl.question("Select a player to draw four", (player) => {
-                if (!this.playerNames.includes(player)) {
-                    console.log("The player is not in the game, please choose another.");
-                    this.doWildAction(card);
-                }
-                else {
-                    console.log(`Player ${player}, has to draw four cards!`);
-                    this.drawFour(player);
-                };
-            });
-        }
-        else {
-            this.rl.question("Choose the next color (red, blue, green, yellow)", (color) => {
-                if (!colors.includes(color)) {
-                    console.log("That is not a valid color, please choose another.");
-                    this.doWildAction(card);
-                }
-                else {
-                    console.log(`The new color is ${color}!`);
-                    this.topColor = color.toLowerCase();
-                    this.topNumber = 0;
-                };
-            });
-        };
-    };
-
-    async promptForPlayerCard(player) {
-        while (true) {
-            this.displayCards(this.peekPlayerDeck(player))
-            const choice = await this.getUserInput("Select a card by entering its number: ");
-            if (this.noValidCards(player)) {
-                console.log("You have no valid cards to play, drawing.")
-                this.drawCard(player);
-            }
-            else if (this.isValidCard(choice, player)) {
-                return choice;
-            }
-            else {
-                console.log(`The card at position ${choice} is not playable!`);
-            };
-        };
-    };
-
-    noValidCards(player) {
-        for (const card of this.players.get(player)) {
-            if (card.type === "wild-card") {
-                return false;
-            }
-            else if (card.type === "action-card" &&
-                card.color === this.topColor) {
-                    return false;
-                }
-            else if (card.type === "normal-card" &&
-                (card.color === this.topColor || card.number === this.topNumber)) {
-                    return false;
-            };
-        };
-
-        return true;
-    };
-    
-    isValidCard(choice, player) {
-        const cardIndex = parseInt(choice);
-        if (isNaN(cardIndex)) {
-            return false;
-        };
-
-        const playerCards =  this.players.get(player);
-        const playerCard = playerCards[cardIndex];
-        if (!(0 <= cardIndex && cardIndex < playerCards.length)) {
-            return false;
-        };
-
-        if (this.isWildCard(playerCard)) {
-            return true;
-        }
-        else if (this.isActionCard(playerCard) &&
-                playerCard.color === this.topColor) {
-                    return true;
-        };
-        return (playerCard.color === this.topColor||
-            playerCard.number === this.topNumber);
-    };
-
-    start() {
-        this.setup(() => {
-            this.drawFirst();
-            this.gameLoop();
+function dealCards() {
+    for (let i = 0; i < 7; i++) {
+        players.forEach((value, key) => {
+            drawCard(key);
         });
     };
 };
 
+function putDiscardToDeck() {
+    deck = discard;
+    discard = [];
+    shuffle();
+};
 
-const uno = new Uno();
-uno.start();
+// Game state functions
+function getBeginState() {
+    return {
+        deck: deck,
+        discard: [],
+        players: players,
+        currentPlayer: getFirstPlayer(),
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+        clockwiseOrder: true,
+        skipNext: false,
+    };
+};
+
+function getFirstPlayer() {
+    return players.keys.next().value;
+};
+
+
+function getPlayerWonGameState(playerId) {
+    return {
+        deck: deck,
+        discard: discard,
+        winner: playerId,
+    };
+};
+
+function getRestartGameState(playerId) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: playerId,
+        move: move,
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+    };
+};
+
+function getNormalCardGameState(playerId, move) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: playerId,
+        move: move,
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+    };
+};
+
+function getDrawTwoActionGameState(currentPlayerId, drawCardPlayerId) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: currentPlayerId,
+        move: "draw-two",
+        playerToDrawCard: drawCardPlayerId,
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+    };
+};
+
+function getDrawFourActionGameState(currentPlayerId, drawCardPlayerId) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: currentPlayerId,
+        move: "draw-four",
+        playerToDrawCard: drawCardPlayerId,
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+    };
+};
+
+function getColorChangeGameState(playerId) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: playerId,
+        move: "change-color",
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+    };
+};
+
+function getReverseOrderGameState(playerId, move) {
+    return {
+        deck: deck,
+        discard: discard,
+        currentPlayer: playerId,
+        move: "reverse",
+        players: players,
+        currentColor: currentColor,
+        currentNumber: currentNumber,
+        clockwiseOrder: clockwiseOrder,
+    };
+};
+
+
+// Predicates for card types
+function isNormalCard(card) {
+    return (card.type === "normal-card");
+};
+
+function isActionCard(card) {
+    return (card.type === "action-card");
+};
+
+function isWildCard(card) {
+    return (card.type === "wild-card");
+};
+
+function isSkipCard(card) {
+    return (card.action === "skip-turn");
+};
+
+function isDrawTwoCard(card) {
+    return (card.action === "draw-two");
+};
+
+function isReverseCard(card) {
+    return (card.action === "reverse");
+};
+
+function isDrawFourCard(card) {
+    return (card.action === "draw-four");
+};
+
+function isChangeColorCard(card) {
+    return (card.action === "change-color");
+};
+
+
+// Game actions for players
+function drawTwo(playerId) {
+    for (let i = 0; i < 2; i++) {
+        drawCard(playerId);
+    };
+};
+
+function drawFour(playerId) {
+    for (let i = 0; i < 4; i++) {
+        drawCard(playerId);
+    };
+};
+
+function drawCard(playerId) {
+    const card = deck.pop();
+    players.get(playerId).push(card);
+};
+
+function discard(playerId, cardMove) {
+    const hand = players.get(playerId).filter(card => card != cardMove);
+    players.set(playerId, hand);
+    discard.push(cardMove);
+};
+
+
+// Stuff for each turn
+function doTurn(playerId) {
+    if (skipNext) {
+        skipNext = false;
+        return;
+    };
+
+    const move = promptPlayerForMove(playerId);
+    if (move === "draw") {
+        drawCard(playerId);
+    }
+    else if (move === "discard") {
+        
+    }
+
+    const winState = checkWinConditions(playedId)
+    if (winState) {
+        return winState;
+    };
+
+    const turnState = doCardAction(playerId, move);
+    return turnState;
+};
+
+function checkWinConditions(playerId, move) {
+    if (players.get(playerId).length === 0) {
+        return getPlayerWonGameState(playerId);
+    }
+    else if (deck.length === 0) {
+        putDiscardToDeck();
+        return getRestartGameState(playerId, move);
+    }
+    else {
+        return;
+    };
+};
+
+
+// Functionality for potential special cards
+function doCardAction(playerId, card) {
+    if (isActionCard()) {
+        if (isSkipCard(card)) {
+            const state = skip
+            skipNext = true;
+        }
+        else if (isReverseCard(card)) {
+            const state = reverseTurnOrder(playerId);
+            return state;
+        }
+        else if (isDrawTwoCard(card)) {
+            promptForChoiceToDraw(playerId, 2);
+        };
+    }
+    else if (isWildCard(card)) {
+        if (isChangeColorCard(card)) {
+            promptForColorChoice(playerId);
+        }
+        else if (isDrawFourCard(card)) {
+            promptForChoiceToDraw(playerId, 4);
+        };
+    }
+    else {
+        return getNormalCardGameState(playerId, move);
+    };
+};
+
+function reverseTurnOrder(playedId) {
+    const reversedPlayers = new Map()
+    const entries = Array.from(players.entries()).reverse();
+    
+    for (const [key, value] of entries) {
+        reversedMap.set(key, value);
+    };
+
+    players = reversedPlayers;
+    clockwiseOrder = !clockwiseOrder;
+
+    return getReverseOrderGameState(playerId);
+};
+
+
+// const data = doGame(gameState, playerMove);
