@@ -96,8 +96,6 @@ function getFirstPlayer() {
 
 function getPlayerWonGameState(playerId) {
     return {
-        deck: deck,
-        discard: discard,
         winner: playerId,
     };
 };
