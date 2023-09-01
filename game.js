@@ -24,7 +24,7 @@ function begin(code, playerIds) {
 
     shuffle();
     dealCards();
-    return getBeginState(getFirstPlayer());
+    return getBeginState();
 };
 
 function createStartDeck() {
@@ -34,21 +34,21 @@ function createStartDeck() {
         // Create the normal cards, two of each number from 1-9 and one 0, for each color.
         deck.push({type: "normal-card", color: color, number: 0});
         for (const number of numbers) {
-            deck.push({type: "normal-card", color: color, number: number});
-            deck.push({type: "normal-card", color: color, number: number});
+            deck.push({type: "normal-card", color: color, value: number});
+            deck.push({type: "normal-card", color: color, value: number});
         };
 
         // Create the action cards, two of each action, for each color
         for (const action of actions) {
-            deck.push({type: "action-card", color: color, action: action});
-            deck.push({type: "action-card", color: color, action: action});
+            deck.push({type: "action-card", color: color, value: action});
+            deck.push({type: "action-card", color: color, value: action});
         };
     };
     
     // Create the wild cards, four of each action
     for (let i = 0; i < 4; i++) {
         for (const action of wild_actions)
-        deck.push({type: "wild-card", color: "black", action: action});
+        deck.push({type: "wild-card", color: "black", value: action});
     };
 
     return deck;
@@ -77,14 +77,14 @@ function putDiscardToDeck() {
 };
 
 // Game state functions
-function getBeginState(firstPlayer) {
+function getBeginState() {
     let topCard = deck.shift();
     return {
         roomCode: roomCode,
         deck: deck,
         discardPile: [topCard],
         players: players,
-        currentPlayer: firstPlayer,
+        currentPlayer: getFirstPlayer(),
         currentColor: topCard.color,
         currentNumber: topCard.number,
         clockwiseOrder: true,
@@ -93,7 +93,7 @@ function getBeginState(firstPlayer) {
 };
 
 function getFirstPlayer() {
-    return Object.keys(players)[0];
+    return Object.keys(players).next.value;
 };
 
 function getPlayerWonGameState(playerId) {
@@ -200,23 +200,23 @@ function isWildCard(card) {
 };
 
 function isSkipCard(card) {
-    return (card.action === "skip-turn");
+    return (card.value === "skip-turn");
 };
 
 function isDrawTwoCard(card) {
-    return (card.action === "draw-two");
+    return (card.value === "draw-two");
 };
 
 function isReverseCard(card) {
-    return (card.action === "reverse");
+    return (card.value === "reverse");
 };
 
 function isDrawFourCard(card) {
-    return (card.action === "draw-four");
+    return (card.value === "draw-four");
 };
 
 function isChangeColorCard(card) {
-    return (card.action === "change-color");
+    return (card.value === "change-color");     
 };
 
 
