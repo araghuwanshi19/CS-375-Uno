@@ -130,3 +130,16 @@ socket.on('lobbyCreationFailed', () => {
 socket.on('lobbyJoinFailed', () => {
   showMessage('You have already joined a lobby');
 });
+
+socket.on('changeHost', () => {
+  showMessage('You are now the host');
+  const newStartBtn = document.createElement("button");
+  newStartBtn.textContent = "Start game";
+
+  const players = document.getElementById("players");
+  newStartBtn.addEventListener('click', () => {
+    socket.emit('startGame', roomCodeSpan.textContent);
+  });  
+  
+  players.appendChild(newStartBtn)
+});
