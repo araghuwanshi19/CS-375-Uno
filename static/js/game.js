@@ -73,6 +73,15 @@ function refreshPlayers(players) {
   }
 }
 
+function getCardListener(card_type, card_color) {
+  console.log(card_color, card_type);
+}
+
+function initializeGame(initialGameState) {
+  console.log('Starting the game with initial state:', initialGameState);
+}
+
+
 // Event listeners
 newLobbyBtn.addEventListener('click', () => {
   socket.emit('newLobby');
@@ -98,19 +107,20 @@ socket.on('lobbyCreated', (roomCode, username) => {
   startBtn.style.display = null;
   lobbyDiv.style.display = null;
   addPlayer(username);
-  showMessage(`You're in! Invite others with code: ${roomCode}`);
 });
 
-socket.on('startGame', () => {
+socket.on('startGame', (initialGameState) => {
   lobbyDiv.style.display = 'none';
   document.body.classList.add('game');
   gameDiv.style.display = null;
   showMessage('The game has begun!');
+
+  initializeGame(initialGameState);
 })
 
 socket.on('playerJoined', (roomCode, newPlayer, players) => {
   refreshPlayers(players);
-  if (currentPlayer == newPlayer) {
+  if (newPlayer) {
     dashDiv.style.display = 'none';
     roomCodeSpan.textContent = roomCode;
     lobbyDiv.style.display = null;
@@ -131,15 +141,14 @@ socket.on('lobbyJoinFailed', () => {
   showMessage('You have already joined a lobby');
 });
 
+socket.on('notEnoughPlayers', () => {
+  showMessage('At least 2 players needed to start a game.');
+});
+
 socket.on('changeHost', () => {
   showMessage('You are now the host');
-  const newStartBtn = document.createElement("button");
-  newStartBtn.textContent = "Start game";
-
-  const players = document.getElementById("players");
-  newStartBtn.addEventListener('click', () => {
-    socket.emit('startGame', roomCodeSpan.textContent);
-  });  
-  
-  players.appendChild(newStartBtn)
+  startBtn.style.display = 'block';
+  startBtn.style.marginLeft = 'auto';
+  startBtn.style.marginRight = 'auto';
 });
+

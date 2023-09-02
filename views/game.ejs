@@ -30,7 +30,7 @@
       <h2>Room Code: <span id="room-code"><%= roomCode %></span></h2>
       <button id="start-button" <% if (!user.isHost) { %> style="display: none;" <% } %>>Start Game</button>
 
-      <h2 id="players">Players:</h2>
+      <h2>Players:</h2>
       <ul id="lobby-player-list">
         <% users.forEach(function(user){ %>
           <li>
@@ -67,7 +67,7 @@
         <table id="hand-table">
           <tr>
             <% user.cards.forEach(function(card){ %>
-              <td>
+              <td style="background-color: <%= card.color %>" onclick="getCardListener(`<%=card.type %>`, `<%=card.color%>`)">
                 <%= card.color %> <%= card.type %>
               </td>
             <% }); %>
