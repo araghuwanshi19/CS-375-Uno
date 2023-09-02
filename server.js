@@ -14,7 +14,7 @@ const httpServer = http.createServer(app);
 const wsServer = socketIO(httpServer);
 
 const initializePassport = require('./passportConfig');
-const uno = require('./uno');
+const { Uno } = require('./uno');
 
 initializePassport(passport);
 
@@ -60,24 +60,29 @@ app.use(flash());
 const getNewId = new ShortUniqueId({ length: 10, dictionary: 'alphanum_upper' });
 
 const rooms = {};
-const newLobbyPlayers = new Set();
-const joinLobbyPlayers = new Set();
+const inGamePlayers = new Set();
 
 // handle websocket connections
 wsServer.on('connection', (socket) => {
 	console.log('A user connected:', socket.request.user.name, socket.id);
 
 	socket.on('newLobby', () => {
-		if (newLobbyPlayers.has(socket.id)) {
+		if (inGamePlayers.has(socket.id)) {
 			socket.emit('lobbyCreationFailed');
 		} else {
 			const roomCode = getNewId();
-			rooms[roomCode] = { players: [[socket.request.user.name, socket.id]], data: {} };
+			const playerInfo = { name: socket.request.user.name, id: socket.id };
+			const playerIds = [playerInfo.id];
+			// initialize game instance
+			const unoGame = new Uno(roomCode, playerIds);
+
+			rooms[roomCode] = { 
+				players: [playerInfo], 
+				game: unoGame,
+				data: {} 
+			};
 			socket.join(roomCode);
-
-			newLobbyPlayers.add(socket.id);
-
-			// socket.emit('redirect', `/lobby?room=${roomCode}`);
+			inGamePlayers.add(socket.id);
 			socket.emit('lobbyCreated', roomCode, socket.request.user.name);
 		}
 	});
@@ -85,32 +90,32 @@ wsServer.on('connection', (socket) => {
 
 	socket.on('joinLobby', (roomCode) => {
 		let currentPlayer = socket.request.user.name;
-		if (joinLobbyPlayers.has(socket.id) || newLobbyPlayers.has(socket.id)) {
+
+		if (inGamePlayers.has(socket.id)) {
 			socket.emit('lobbyJoinFailed');
 		} else if (rooms[roomCode]) {
-			rooms[roomCode].players.push([currentPlayer, socket.id]);
+			const playerInfo = {name: currentPlayer, id: socket.id};
+			rooms[roomCode].players.push(playerInfo);
 			socket.join(roomCode);
-			wsServer.to(roomCode).emit('playerJoined', roomCode, currentPlayer, rooms[roomCode].players.map(x => x[0]));
-
-			joinLobbyPlayers.add(socket.id);
-			// socket.emit('redirect', `/lobby?room=${roomCode}`);
-
-			// if the lobby has three players, start the game automatically
-			if (rooms[roomCode].players.length === 3) {
-				// TODO: create a function / write code to start the game
-			}
-
+			wsServer.to(roomCode).emit('playerJoined', roomCode, currentPlayer, rooms[roomCode].players.map(playerInfo => playerInfo.name));
+			inGamePlayers.add(socket.id);
 		} else {
 			socket.emit('lobbyNotFound');
 		}
 	});
 
 	socket.on('startGame', (roomCode) => {
-		if (!rooms[roomCode] || rooms[roomCode].players[0][1] != socket.id) {
-			return;
-		}
+		if (rooms[roomCode] && rooms[roomCode].players[0].id === socket.id) {
+			// check if there are atleast 2 players in lobby
+			if (rooms[roomCode].players.length >= 2) {
+				const unoGame = rooms[roomCode].game;
+				const initialGameState = unoGame.begin();
 
-		wsServer.to(roomCode).emit('startGame');
+				wsServer.to(roomCode).emit('startGame', initialGameState);
+			} else {
+				socket.emit('notEnoughPlayers');
+			}
+		}
 	});
 
 	socket.on('disconnect', () => {
@@ -118,17 +123,15 @@ wsServer.on('connection', (socket) => {
 		for (const roomCode in rooms) {
 			const index = rooms[roomCode].players.map(x => x[1]).indexOf(socket.id);
 
-			if (index === 0 && rooms[roomCode].players.length >= 2) {
-				console.log("working");
+			// if disconnected player was the host, change host
+			if (index === 0) {
 				wsServer.to(rooms[roomCode].players[1]).emit('changeHost');
-
 			}
 
 			if (index !== -1) {
-				console.log(rooms[roomCode].players)
 				rooms[roomCode].players.splice(index, 1);
-				console.log(rooms[roomCode].players)
 				wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.map(x => x[0]));
+
 				// if a lobby has 0 players, delete lobby
 				if (rooms[roomCode].players.length === 0) {
 					delete rooms[roomCode];

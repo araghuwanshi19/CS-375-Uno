@@ -6,6 +6,7 @@ const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 
 class Uno {
+    
     constructor(code, playerIds) {
         this.code = code;
         this.players = this.createPlayerMap(playerIds)
@@ -23,6 +24,7 @@ class Uno {
     begin() {
         this.shuffle();
         this.dealCards();
+        this.drawTopCard();
         return this.getBeginState();
     };
 
@@ -30,11 +32,10 @@ class Uno {
     // Map each player ID to a "deck" (or list)
     createPlayerMap(playerIds) {
         const players = new Map();
-    
+
         playerIds.forEach(id => {
-            players[id] = [];
+            players.set([id], []);
         });
-    
         return players;
     };
 
@@ -44,23 +45,23 @@ class Uno {
 
         for (const color of colors) {
             // Create the normal cards, two of each number from 1-9 (and one 0), for each color
-            this.deck.push({type: "normal-card", color: color, number: 0});
+            deck.push({type: "normal-card", color: color, number: 0});
             for (const number of numbers) {
-                this.deck.push({type: "normal-card", color: color, value: number});
-                this.deck.push({type: "normal-card", color: color, value: number});
+                deck.push({type: "normal-card", color: color, value: number});
+                deck.push({type: "normal-card", color: color, value: number});
             };
 
             // Create the action cards, two of each action, for each color
             for (const action of actions) {
-                this.deck.push({type: "action-card", color: color, value: action});
-                this.deck.push({type: "action-card", color: color, value: action});
+                deck.push({type: "action-card", color: color, value: action});
+                deck.push({type: "action-card", color: color, value: action});
             };
         };
         
         // Create the wild cards, four of each action
         for (let i = 0; i < 4; i++) {
             for (const action of wild_actions)
-            this.deck.push({type: "wild-card", color: "black", value: action});
+            deck.push({type: "wild-card", color: "black", value: action});
         };
 
         return deck;
@@ -81,6 +82,24 @@ class Uno {
             });
         };
     };
+
+    // draw top card and handle all top card rules
+    drawTopCard() {
+        while (true) {
+            const topCard = this.deck.pop();
+            this.discardPile.push(topCard);
+
+            this.topColor = topCard.color;
+            this.topValue = this.topValue;
+
+            if(this.topValue === 'wild-draw-four') {
+                this.deck.push(this.discardPile.pop());
+                this.shuffle();
+            } else {
+                break;
+            }
+        }
+    }
     
     // If the deck runs out of cards, move all cards from the discard pile back to the deck
     putDiscardToDeck() {
@@ -222,7 +241,7 @@ class Uno {
         return {
             roomCode: this.code,
             deck: this.deck,
-            discardPile: [topCard],
+            discardPile: this.discardPile,
             players: this.players,
             currentPlayer: this.getFirstPlayer(),
             topColor: this.topColor,
@@ -231,6 +250,11 @@ class Uno {
             skipNext: false,
         };
     };
+
+    getFirstPlayer() {
+        const playerIds = Array.from(this.players.keys());
+        return playerIds[0];
+    }
 
     getPlayerWonGameState(playerId) {
         return {
