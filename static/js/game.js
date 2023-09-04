@@ -65,19 +65,24 @@ function addPlayer(username, cards = 0) {
 }
 
 function refreshPlayers(players) {
-    lobbyPlayerListDiv.innerHTML = "";
-    gamePlayerListDiv.innerHTML = "";
+    lobbyPlayerListDiv.innerText = "";
+    gamePlayerListDiv.innerText = "";
 
     for (let player of players) {
         addPlayer(player);
     }
 }
 
+function setTopCard(card) {
+    discardDiv.className = card.color;
+    discardDiv.textContent = card.value;
+}
+
 function addCards(cards) {
     for (let card of cards) {
         let newCard = document.createElement("td");
-        newCard.style.background = card.color;
-        newCard.textContent = card.type;
+        newCard.className = card.color;
+        newCard.textContent = card.value;
         newCard.addEventListener("click", () => {
             socket.emit('playCard', newCard.cellIndex);
         });
@@ -123,13 +128,6 @@ socket.on('lobbyCreated', (roomCode, username) => {
     addPlayer(username);
 });
 
-socket.on('startGame', (initialGameState) => {
-    lobbyDiv.style.display = 'none';
-    document.body.classList.add('game');
-    gameDiv.style.display = null;
-    showMessage('The game has begun!');
-})
-
 socket.on('playerJoined', (roomCode, newPlayer, players) => {
     refreshPlayers(players);
     if (currentPlayer === newPlayer) {
@@ -162,13 +160,26 @@ socket.on('changeHost', () => {
     showMessage('You are the new host!');
 });
 
+socket.on('setupGame', (topCard, hand) => {
+    console.log(topCard, hand);
+    setTopCard(topCard);
+
+    addCards(hand);
+})
+
+socket.on('startGame', () => {
+    lobbyDiv.style.display = 'none';
+    document.body.classList.add('game');
+    gameDiv.style.display = null;
+    showMessage('The game has begun!');
+});
+
+socket.on('yourTurn', () => {
+    showMessage('It\'s your turn!');
+});
+
 socket.on('drawCards', (cards) => {
     addCards(cards);
-
-    if (gameDiv.style.display == 'none') {
-        return;
-    }
-
     showMessage(`You drew ${cards.length} cards!`);
 });
 

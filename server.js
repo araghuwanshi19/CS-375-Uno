@@ -23,15 +23,15 @@ const port = 3000;
 app.set('view engine', 'ejs');
 
 app.use(express.urlencoded({
-	extended: false
+    extended: false
 }));
 
 app.use(express.static(path.join(__dirname, "static")));
 
 const sessionMiddleware = session({
-	secret: process.env.SECRET_KEY,
-	resave: false,
-	saveUninitialized: false
+    secret: process.env.SECRET_KEY,
+    resave: false,
+    saveUninitialized: false
 });
 
 app.use(sessionMiddleware);
@@ -48,11 +48,11 @@ wsServer.use(wrap(passport.session()));
 
 // Tell websocket to only connect if authorized
 wsServer.use((socket, next) => {
-	if (socket.request.user) {
-		next();
-	} else {
-		next(new Error('unauthorized'))
-	}
+    if (socket.request.user) {
+        next();
+    } else {
+        next(new Error('unauthorized'))
+    }
 });
 
 app.use(flash());
@@ -66,295 +66,298 @@ const inGamePlayers = new Set();
 
 // handle websocket connections
 wsServer.on('connection', (socket) => {
-	console.log('A user connected:', socket.request.user.name, socket.id);
-	userSockets.set(socket.request.user.name, socket.id);
-	socket.request.session.socketId = socket.id;
+    console.log('A user connected:', socket.request.user.name, socket.id);
+    userSockets.set(socket.request.user.name, socket.id);
+    socket.request.session.socketId = socket.id;
 
-	socket.on('newLobby', () => {
-		if (inGamePlayers.has(socket.id)) {
-			socket.emit('lobbyCreationFailed');
-		} 
-		else {
-			const roomCode = getNewId();
-			const playerInfo = { name: socket.request.user.name, id: socket.id };
-			const playerIds = [playerInfo.id];
-			// initialize game instance
-			const unoGame = new Uno(roomCode, playerIds);
-			rooms[roomCode] = { 
-				players: [playerInfo], 
-				game: unoGame,
-				data: {} 
-			};
+    socket.on('newLobby', () => {
+        if (inGamePlayers.has(socket.id)) {
+            socket.emit('lobbyCreationFailed');
+        }
+        else {
+            const roomCode = getNewId();
+            const playerInfo = { name: socket.request.user.name, id: socket.id };
+            rooms[roomCode] = {
+                players: [playerInfo],
+                game: null,
+                data: {}
+            };
 
-			socket.join(roomCode);
-			inGamePlayers.add(socket.id);
-			socket.emit('lobbyCreated', roomCode, socket.request.user.name);
-		};
-	});
+            socket.join(roomCode);
+            inGamePlayers.add(socket.id);
+            socket.emit('lobbyCreated', roomCode, socket.request.user.name);
+        };
+    });
 
 
-	socket.on('joinLobby', (roomCode) => {
-		let currentPlayer = socket.request.user.name;
+    socket.on('joinLobby', (roomCode) => {
+        let currentPlayer = socket.request.user.name;
 
-		if (inGamePlayers.has(socket.id)) {
-			socket.emit('lobbyJoinFailed');
-		} else if (rooms[roomCode]) {
-			const playerInfo = {name: currentPlayer, id: socket.id};
-			rooms[roomCode].players.push(playerInfo);
-			socket.join(roomCode);
-			wsServer.to(roomCode).emit('playerJoined', roomCode, currentPlayer, rooms[roomCode].players.map(playerInfo => playerInfo.name));
-			inGamePlayers.add(socket.id);
-		} else {
-			socket.emit('lobbyNotFound');
-		}
-	});
+        if (inGamePlayers.has(socket.id)) {
+            socket.emit('lobbyJoinFailed');
+        } else if (rooms[roomCode]) {
+            const playerInfo = { name: currentPlayer, id: socket.id };
+            rooms[roomCode].players.push(playerInfo);
+            socket.join(roomCode);
+            wsServer.to(roomCode).emit('playerJoined', roomCode, currentPlayer, rooms[roomCode].players.map(playerInfo => playerInfo.name));
+            inGamePlayers.add(socket.id);
+        } else {
+            socket.emit('lobbyNotFound');
+        }
+    });
 
-	socket.on('startGame', (roomCode) => {
-		const room = rooms[roomCode];
-		if (room && room.players[0].id === socket.id) {
-			// check if there are atleast 2 players in lobby
-			if (room.players.length >= 2) {
-				const unoGame = rooms[roomCode].game;
-				const initialGameState = unoGame.begin();
+    socket.on('startGame', (roomCode) => {
+        const room = rooms[roomCode];
+        if (room && room.players[0].id === socket.id) {
+            // check if there are atleast 2 players in lobby
+            if (room.players.length >= 2) {
+                // initialize game instance
+                const unoGame = new Uno(roomCode, room.players.map(x => x.id));
+                room.game = unoGame;
+                const initialGameState = unoGame.begin();
+                console.dir(initialGameState, { depth: 9 });
 
-				const firstPlayer = initialGameState.currentPlayer;
-				wsServer.to(roomCode).emit('startGame', initialGameState);
+                for (let player of initialGameState.players) {
+                    wsServer.to(player[0]).emit('setupGame', { color: initialGameState.topColor, value: initialGameState.topValue }, player[1]);
+                }
 
-				socket.emit('yourTurn', firstPlayer);
-			} else {
-				socket.emit('notEnoughPlayers');
-			}
-		}
-	});
-	
-	// TODO: figure out how to do turns
-	socket.on('yourTurn', () => {
-		//
-	});
+                wsServer.to(roomCode).emit('startGame');
 
-	// player actions
-	socket.on('discard', (playerId, card) => {
+                socket.emit('yourTurn');
+            } else {
+                socket.emit('notEnoughPlayers');
+            }
+        }
+    });
 
-	});
+    // TODO: figure out how to do turns
+    socket.on('yourTurn', () => {
+        //
+    });
 
-	socket.on('draw', (playerId) => {
-		socket.emit('handleState', state);
-	});
+    // player actions
+    socket.on('discard', (playerId, card) => {
 
-	socket.on('handleState', (state) => {
-		switch (state.move) {
-			case "draw" : {
-				wsServer.to(state.currentPlayer).emit('yourTurn');
-				break;
-			};
-			case "discard" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
+    });
 
-			// Turn progression cases
-			case "skip" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-			case "reverse" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-			
-			case "restart" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
+    socket.on('draw', (playerId) => {
+        socket.emit('handleState', state);
+    });
 
-			// Require player input
-			case "draw-cards" : {
-				wsServer.to(state.currentPlayer).emit('selectPlayerToDraw');
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
+    socket.on('handleState', (state) => {
+        switch (state.move) {
+            case "draw": {
+                wsServer.to(state.currentPlayer).emit('yourTurn');
+                break;
+            };
+            case "discard": {
+                const nextPlayer = getNextPlayer(state);
+                wsServer.to(nextPlayer).emit('yourTurn');
+                break;
+            };
 
-			case "change-color" : {
-				wsServer.to(state.currentPlayer).emit('selectColor');
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
+            // Turn progression cases
+            case "skip": {
+                const nextPlayer = getNextPlayer(state);
+                wsServer.to(nextPlayer).emit('yourTurn');
+                break;
+            };
+            case "reverse": {
+                const nextPlayer = getNextPlayer(state);
+                wsServer.to(nextPlayer).emit('yourTurn');
+                break;
+            };
 
-			case "won" : {
-				break;
-			};
-		};
-	});
+            case "restart": {
+                const nextPlayer = getNextPlayer(state);
+                wsServer.to(nextPlayer).emit('yourTurn');
+                break;
+            };
 
-	function getNextPlayer(state) {
-		const currentPlayer = state.currentPlayer;
-		const game = rooms[state.roomCode].game;
-		if (state.move === "skip") {
-			return game.getNextPlayer(currentPlayer, skipped=true, reversed=state.reversed);
-		};
+            // Require player input
+            case "draw-cards": {
+                wsServer.to(state.currentPlayer).emit('selectPlayerToDraw');
+                const nextPlayer = getNextPlayer(state);
+                wsServer.to(nextPlayer).emit('yourTurn');
+                break;
+            };
 
-		return game.getNextPlayer(currentPlayer, skipped=false, reversed=state.reversed);
-	};
+            case "change-color": {
+                wsServer.to(state.currentPlayer).emit('selectColor');
+                const nextPlayer = getNextPlayer(state);
+                wsServer.to(nextPlayer).emit('yourTurn');
+                break;
+            };
 
-	socket.on('selectColor', (state) => {
-		const colors = ["red", "blue", "yellow", "green", "r", "b", "y", "g"];
-		const game = rooms[state.roomCode].game;
-		while (true) {
-			const color = prompt('Select the new color');
-			if (colors.includes(newColor.toLowerCase())) {
-				game.setColor(color);
-				
-			};
-		};
-	});
+            case "won": {
+                break;
+            };
+        };
+    });
 
-	socket.on('colorChosen', (roomCode, colorChosen) => {
-		wsServer.to(roomCode).emit('playerChoseColor', colorChosen);
-	});
-	
-	socket.on('selectPlayerToDraw', (state) => {
-		const numCards = state.numCards;
-		const room = rooms[state.roomCode];
-		const players = room.players.map(player => player.name);
-		while (true) {
-			const nameToDraw = prompt(`Enter name of the player to draw ${numCards}cards!`);
-			if (players.includes(nameToDraw.toLowerCase())) {
-				const game = room.game;
-				const player = room.players.find(player => player.name === nameToDraw);
-				const state = game.drawCards(player.id, numCards);
-				
-			};
-		};
-	});
-	
-	socket.on('disconnect', () => {
-		console.log('A user disconnected:', socket.id);
-		for (const roomCode in rooms) {
-			const index = rooms[roomCode].players.map(x => x.id).indexOf(socket.id);
-			
-			if (index !== -1) {
-				let room = rooms[roomCode];
+    function getNextPlayer(state) {
+        const currentPlayer = state.currentPlayer;
+        const game = rooms[state.roomCode].game;
+        if (state.move === "skip") {
+            return game.getNextPlayer(currentPlayer, skipped = true, reversed = state.reversed);
+        };
 
-				room.players.splice(index, 1);
-				wsServer.to(roomCode).emit('playerLeft', room.players.map(x => x.name));
+        return game.getNextPlayer(currentPlayer, skipped = false, reversed = state.reversed);
+    };
 
-				// if a lobby has 0 players, delete lobby
-				if (room.players.length === 0) {
-					delete rooms[roomCode];
-				} else {
-					// Disconnected player was host, select new one
-					if (index == 0) {
-						wsServer.to(room.players[0].id).emit('changeHost');
-					}
-				}
-				break;
-			};
-		};
-	});
+    socket.on('selectColor', (state) => {
+        const colors = ["red", "blue", "yellow", "green", "r", "b", "y", "g"];
+        const game = rooms[state.roomCode].game;
+        while (true) {
+            const color = prompt('Select the new color');
+            if (colors.includes(newColor.toLowerCase())) {
+                game.setColor(color);
+
+            };
+        };
+    });
+
+    socket.on('colorChosen', (roomCode, colorChosen) => {
+        wsServer.to(roomCode).emit('playerChoseColor', colorChosen);
+    });
+
+    socket.on('selectPlayerToDraw', (state) => {
+        const numCards = state.numCards;
+        const room = rooms[state.roomCode];
+        const players = room.players.map(player => player.name);
+        while (true) {
+            const nameToDraw = prompt(`Enter name of the player to draw ${numCards} cards!`);
+            if (players.includes(nameToDraw.toLowerCase())) {
+                const game = room.game;
+                const player = room.players.find(player => player.name === nameToDraw);
+                const state = game.drawCards(player.id, numCards);
+
+            };
+        };
+    });
+
+    socket.on('disconnect', () => {
+        console.log('A user disconnected:', socket.id);
+        for (const roomCode in rooms) {
+            const index = rooms[roomCode].players.map(x => x.id).indexOf(socket.id);
+
+            if (index !== -1) {
+                let room = rooms[roomCode];
+
+                room.players.splice(index, 1);
+                wsServer.to(roomCode).emit('playerLeft', room.players.map(x => x.name));
+
+                // if a lobby has 0 players, delete lobby
+                if (room.players.length === 0) {
+                    delete rooms[roomCode];
+                } else {
+                    // Disconnected player was host, select new one
+                    if (index == 0) {
+                        wsServer.to(room.players[0].id).emit('changeHost');
+                    }
+                }
+                break;
+            };
+        };
+    });
 });
 
 
 // serve the login.html file at the root path
 app.get("/", (req, res) => {
-	res.render("index");
+    res.render("index");
 });
 
 app.get("/game", checkNotAuthenticated, (req, res) => {
-	return res.render("game", {username: req.user.name})
+    return res.render("game", { username: req.user.name })
 })
 
 app.get("/login", checkAuthenticated, (req, res) => {
-	res.render("login");
+    res.render("login");
 });
 
 app.get("/register", checkAuthenticated, (req, res) => {
-	res.render("register");
+    res.render("register");
 });
 
 app.get("/logout", (req, res, next) => {
-	req.logOut(() => {
-		req.flash('success_message', 'You have successfully logged out');
-		res.redirect('/login');
-	});
+    req.logOut(() => {
+        req.flash('success_message', 'You have successfully logged out');
+        res.redirect('/login');
+    });
 });
 
 app.post('/register', async (req, res) => {
-	let { username, password, password2 } = req.body;
+    let { username, password, password2 } = req.body;
 
-	let errors = [];
+    let errors = [];
 
-	if (!username || !password || !password2) {
-		errors.push({ message: 'Please enter all fields' });
-	};
+    if (!username || !password || !password2) {
+        errors.push({ message: 'Please enter all fields' });
+    };
 
-	if (password.length < 6) {
-		errors.push({ message: "Password should be atleast 6 characters long" });
-	};
+    if (password.length < 6) {
+        errors.push({ message: "Password should be atleast 6 characters long" });
+    };
 
-	if (password != password2) {
-		errors.push({ message: "Passwords do not match" });
-	};
+    if (password != password2) {
+        errors.push({ message: "Passwords do not match" });
+    };
 
-	if (errors.length > 0) {
-		res.render('register', { errors });
-	} 
-	else {
-		try {
-			// validation passed
-			let hashpassword = await argon2.hash(password);
+    if (errors.length > 0) {
+        res.render('register', { errors });
+    }
+    else {
+        try {
+            // validation passed
+            let hashpassword = await argon2.hash(password);
 
-			const results = await pool.query(
-				`SELECT * FROM users WHERE name = $1`, [username]
-			);
+            const results = await pool.query(
+                `SELECT * FROM users WHERE name = $1`, [username]
+            );
 
-			if (results.rows.length > 0) {
-				errors.push({ message: "Username already in use" });
-				res.render('register', { errors });
-			} else {
-				pool.query(`INSERT INTO users (name, password) VALUES ($1, $2) RETURNING id, password`, [username, hashpassword], (err, results) => {
-					if (err) {
-						throw err;
-					}
-					req.flash('success_message', 'Your account has been registered. Please log in');
-					res.redirect('/login');
-				});
-			};
-		} 
-		catch (err) {
-			// handle errors
-			throw err;
-		};
-	};
+            if (results.rows.length > 0) {
+                errors.push({ message: "Username already in use" });
+                res.render('register', { errors });
+            } else {
+                pool.query(`INSERT INTO users (name, password) VALUES ($1, $2) RETURNING id, password`, [username, hashpassword], (err, results) => {
+                    if (err) {
+                        throw err;
+                    }
+                    req.flash('success_message', 'Your account has been registered. Please log in');
+                    res.redirect('/login');
+                });
+            };
+        }
+        catch (err) {
+            // handle errors
+            throw err;
+        };
+    };
 });
 
 app.post('/login', passport.authenticate('local', {
-	successRedirect: '/game',
-	failureRedirect: '/login',
-	failureFlash: true,
+    successRedirect: '/game',
+    failureRedirect: '/login',
+    failureFlash: true,
 }));
 
 function checkAuthenticated(req, res, next) {
-	if (req.isAuthenticated()) {
-		return res.redirect('/game');
-	};
-	next();
+    if (req.isAuthenticated()) {
+        return res.redirect('/game');
+    };
+    next();
 };
 
 function checkNotAuthenticated(req, res, next) {
-	if (req.isAuthenticated()) {
-		req.session.socketId = userSockets.get(req.user.name);
-		return next();
-	}
-	res.redirect('/login');
+    if (req.isAuthenticated()) {
+        req.session.socketId = userSockets.get(req.user.name);
+        return next();
+    }
+    res.redirect('/login');
 };
 
 // start the http server
 httpServer.listen(port, () => {
-	console.log(`WebSocket server is running on port ${port}`);
+    console.log(`WebSocket server is running on port ${port}`);
 });

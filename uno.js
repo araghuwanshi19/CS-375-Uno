@@ -1,6 +1,3 @@
-const socket = io();
-
-// Used for card data and types
 const actions = ["draw-two", "reverse", "skip-turn"];
 const wild_actions = ["draw-four", "change-color"];
 const colors = ["red", "blue", "green", "yellow"];
@@ -90,7 +87,7 @@ class Uno {
             this.discardPile.push(topCard);
 
             this.topColor = topCard.color;
-            this.topValue = this.topValue;
+            this.topValue = topCard.topValue;
 
             if (this.topValue === 'wild-draw-four') {
                 this.deck.push(this.discardPile.pop());
