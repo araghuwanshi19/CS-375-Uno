@@ -107,7 +107,7 @@ wsServer.on('connection', (socket) => {
 			inGamePlayers.add(socket.id);
 		} else {
 			socket.emit('lobbyNotFound');
-		}
+		};
 	});
 
 	socket.on('startGame', (roomCode) => {
@@ -117,80 +117,81 @@ wsServer.on('connection', (socket) => {
 				const unoGame = rooms[roomCode].game;
 				const initialGameState = unoGame.begin();
 
-				const firstPlayer = initialGameState.currentPlayer;
-				socket.emit('yourTurn', firstPlayer);
-				
+				const firstPlayer = initialGameState.currentPlayer;				
 				wsServer.to(roomCode).emit('startGame', initialGameState);
+				wsServer.to(firstPlayer).emit('yourTurn', initialGameState);
 			} else {
 				socket.emit('notEnoughPlayers');
-			}
-		}
-	});
-	
-	// TODO: figure out how to do turns
-	socket.on('yourTurn', () => {
-		showMessage('It is now your turn!');
-	});
-
-	// player actions
-	socket.on('discard', (playerId, card) => {
-
-	});
-
-	socket.on('draw', (playerId) => {
-		socket.emit('handleState', state);
-	});
-
-	socket.on('handleState', (state) => {
-		switch (state.move) {
-			case "draw" : {
-				wsServer.to(state.currentPlayer).emit('yourTurn');
-				break;
-			};
-			case "discard" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-
-			// Turn progression cases
-			case "skip" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-			case "reverse" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-			
-			case "restart" : {
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-
-			// Require player input
-			case "draw-cards" : {
-				wsServer.to(state.currentPlayer).emit('selectPlayerToDraw');
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-
-			case "change-color" : {
-				wsServer.to(state.currentPlayer).emit('selectColor');
-				const nextPlayer = getNextPlayer(state);
-				wsServer.to(nextPlayer).emit('yourTurn');
-				break;
-			};
-
-			case "won" : {
-				break;
 			};
 		};
 	});
+	
+	socket.on('yourTurn', (state) => {
+		showMessage('It is now your turn!');
+		const currentPlayer = state.currentPlayer;
+		const game = rooms[state.roomCode].game;
+		const move = getPlayerMove(currentPlayer);
+		const newState = checkMove(move, game, currentPlayer);
+		if (move === "draw") {
+			wsServer.to(currentPlayer).emit('yourTurn');
+			return;
+		};
+
+		const cardPlayed = game.players[currentPlayer][move];
+		game.setTopCard(cardPlayed);
+
+		const gameOverState = game.checkWinConditions(currentPlayer, cardPlayed);
+		if (gameOverState.move === "won") {
+			wsServer.to(state.roomCode).emit('gameWon');
+		}
+		else if (gameOverState.move === "restart") {
+			showMessage("Deck is out of cards! Shuffling...");
+		}
+		else {
+			if (newState.move === "skip" ||
+				newState.move === "discard" ||
+				newState.move === "reverse" ||
+				newState.move === "draw-cards" ||
+				newState.move === "change-color") {
+					const nextPlayer = getNextPlayer(newState);
+					wsServer.to(nextPlayer).emit('yourTurn');
+			};
+		};
+		//wsServer.emit(socket.id).emit('handleCard', card);
+	});
+
+	
+	function checkMove(move, game, player) {
+		if (move === "draw") {
+			return game.drawCard(player);
+		};
+		
+		const card = game.players[socket.id][move];
+		if (game.isNormalCard(card)) {
+			return game.getNormalCardGameState(player);
+		}
+		else if (game.isSkipCard(card)) {
+			return game.skipNext(player);
+		}
+		else if (game.isDrawTwoCard(card)) {
+			const nextPlayer = getNextPlayer(player, reversed=game.reversed);
+			return game.drawCards(nextPlayer, 2);
+		}
+		else if (game.isReverseCard(card)) {
+			return game.reverseTurnOrder(player);
+		}
+		else if (game.isDrawFourCard(card)) {
+			const nextPlayer = getNextPlayer(player, reversed=game.reversed)
+			return game.drawCards(nextPlayer, 4);
+		}
+		else if (game.isChangeColorCard(card)) {
+			const color = getColorSelection(player);
+			return game.setColor(player, color);
+		}
+		else {
+			
+		};
+	};
 
 	function getNextPlayer(state) {
 		const currentPlayer = state.currentPlayer;
@@ -209,21 +210,6 @@ wsServer.on('connection', (socket) => {
 			const color = prompt('Select the new color');
 			if (colors.includes(newColor.toLowerCase())) {
 				game.setColor(color);
-				
-			};
-		};
-	});
-	
-	socket.on('selectPlayerToDraw', (state) => {
-		const numCards = state.numCards;
-		const room = rooms[state.roomCode];
-		const players = room.players.map(player => player.name);
-		while (true) {
-			const nameToDraw = prompt(`Enter name of the player to draw ${numCards}cards!`);
-			if (players.includes(nameToDraw.toLowerCase())) {
-				const game = room.game;
-				const player = room.players.find(player => player.name === nameToDraw);
-				const state = game.drawCards(player.id, numCards);
 				
 			};
 		};
