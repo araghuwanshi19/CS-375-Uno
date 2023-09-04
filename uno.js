@@ -1,3 +1,4 @@
+// Used for card data and types
 const actions = ["draw-two", "reverse", "skip-turn"];
 const wild_actions = ["draw-four", "change-color"];
 const colors = ["red", "blue", "green", "yellow"];
@@ -29,10 +30,10 @@ class Uno {
     // Map each player ID to a "deck" (or list)
     createPlayerMap(playerIds) {
         const players = new Map();
-
         playerIds.forEach(id => {
             players.set([id], []);
         });
+
         return players;
     };
 
@@ -115,7 +116,7 @@ class Uno {
         return this.getDrawCardsActionGameState(playerId, numCards);
     };
 
-    setColor(color) {
+    setColor(playerId, color) {
         const colors = {
             "r": "red",
             "b": "blue",
@@ -130,6 +131,23 @@ class Uno {
         else {
             this.topColor = color;
         };
+
+        return this.getColorChangeCardGameState(playerId);
+    };
+
+    setTopCard(card) {
+        const color = card.color;
+        if (!color === "black") {
+            this.topColor = color;
+        };
+
+        const number = parseInt(card.value);
+        if (isNaN(number)) {
+            this.topValue = "any";
+        }
+        else {
+            this.topValue = number;
+        };
     };
 
     // Per turn functionality: occurs on each player turn
@@ -139,68 +157,22 @@ class Uno {
         return this.getPlayerDrewCardGameState(playerId, card);
     };
 
-    doTurn(playerId) {
-        if (skipNext) {
-            skipNext = false;
-            return;
-        };
-
-        const move = promptPlayerForMove(playerId);
-        if (move === "draw") {
-            const state = drawCard(playerId);
-            return state;
-        }
-
-        const winState = this.checkWinConditions(playerId)
-        if (winState) {
-            return winState;
-        };
-
-        const turnState = doCardAction(playerId, move);
-        return turnState;
-    };
-
-    checkWinConditions(playerId, move) {
+    checkWinConditions(playerId, card) {
         if (players.get(playerId).length === 0) {
-            return getPlayerWonGameState(playerId);
+            return this.getPlayerWonGameState(playerId);
         }
         else if (deck.length === 0) {
             putDiscardToDeck();
-            return getRestartGameState(playerId, move);
+            return this.getRestartGameState(playerId, card);
         }
         else {
-            return;
+            return {move: "continue"};
         };
     };
 
-    doCardAction(playerId, card) {
-        if (this.isActionCard()) {
-            if (this.isSkipCard(card)) {
-                skipNext = true;
-                const state = this.getSkipCardGameState(playerId);
-                return state;
-            }
-            else if (this.isReverseCard(card)) {
-                const state = this.reverseTurnOrder(playerId);
-                return state;
-            }
-            else if (isDrawTwoCard(card)) {
-                const state = this.getDrawCardsActionGameState(playerId, 2);
-                return state;
-            };
-        }
-        else if (this.isWildCard(card)) {
-            if (this.isChangeColorCard(card)) {
-                promptForColorChoice(playerId);
-            }
-            else if (this.isDrawFourCard(card)) {
-                const state = this.getDrawCardsActionGameState(playerId, 4);
-                return state;
-            };
-        }
-        else if (this.isNormalCard(card)) {
-            return this.getNormalCardGameState(playerId, move);
-        };
+    skipNext(playerId) {
+        this.skipNext = true;
+        return this.getSkipCardGameState(playerId);
     };
 
     reverseTurnOrder(playerId) {
@@ -213,40 +185,56 @@ class Uno {
 
         this.players = reversedPlayers;
         this.reversed = !this.reversed;
-        return getReverseOrderGameState(playerId);
+        return this.getReverseOrderGameState(playerId);
     };
 
     // Predicates for card types
     isNormalCard(card) {
-        return (card.type === "normal-card");
-    };
-
-    isActionCard(card) {
-        return (card.type === "action-card");
-    };
-
-    isWildCard(card) {
-        return (card.type === "wild-card");
+        return (
+            card.type === "normal-card" &&
+            colors.includes(card.color) &&
+            0 <= card.value && card.value <= 9
+        );
     };
 
     isSkipCard(card) {
-        return (card.value === "skip-turn");
+        return (
+            card.type === "action-card" &&
+            colors.includes(card.color) &&
+            card.value === "skip-turn"
+        );
     };
 
     isDrawTwoCard(card) {
-        return (card.value === "draw-two");
+        return (
+            card.type === "action-card" &&
+            colors.includes(card.color) &&
+            card.value === "draw-two"
+        );
     };
 
     isReverseCard(card) {
-        return (card.value === "reverse");
+        return (
+            card.type === "action-card" &&
+            colors.includes(card.color) &&
+            card.value === "reverse"
+        );
     };
 
     isDrawFourCard(card) {
-        return (card.value === "draw-four");
+        return (
+            card.type === "wild-card" &&
+            card.color === "black" &&
+            card.value === "draw-four"
+        );
     };
 
     isChangeColorCard(card) {
-        return (card.value === "change-color");
+        return (
+            card.type === "wild-card" &&
+            card.color === "black" &&
+            card.value === "change-color"
+        );
     };
 
 
@@ -327,7 +315,7 @@ class Uno {
         };
     };
 
-    getNormalCardGameState(playerId, move) {
+    getNormalCardGameState(playerId) {
         return {
             roomCode: this.code,
             deck: this.deck,
