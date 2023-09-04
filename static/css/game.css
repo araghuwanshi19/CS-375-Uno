@@ -4,6 +4,23 @@ body.game {
   height: 100vh;
 }
 
+#color-select {
+  text-align: center;
+  visibility: hidden;
+  position: fixed;
+  width: 200px;
+  top: 30%;
+  left: 10px;
+  height: 30%;
+  display: flex;
+  row-gap: 5px;
+  flex-direction: column;
+}
+
+#color-select.show {
+  visibility: visible;
+}
+
 #message-container {
   position: fixed;
   width: 300px;
@@ -101,7 +118,7 @@ body.game {
   align-content: center;
 }
 
-#discard-pile, #draw-pile {
+#discard-pile {
   display: inline-block;
   border: 1px solid black;
   height: 120px;
@@ -112,9 +129,34 @@ body.game {
   align-content: flex-end;
 }
 
-#hand-table tr > td {
+#hand-table > td {
   display: inline-block;
   border: 1px solid black;
   width: 120px;
   height: 120px;
+}
+
+.black, .red, .green, .blue {
+    color: white;
+}
+
+.black {
+    background-color: black;
+}
+
+.red {
+    background-color: red;
+}
+
+.green {
+    background-color: green;
+}
+
+.blue {
+    background-color: blue;
+}
+
+.yellow {
+    background-color: yellow;
+    color: black;
 }

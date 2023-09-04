@@ -1,4 +1,3 @@
-
 // Used for card data and types
 const actions = ["draw-two", "reverse", "skip-turn"];
 const wild_actions = ["draw-four", "change-color"];
@@ -89,7 +88,7 @@ class Uno {
             this.discardPile.push(topCard);
 
             this.topColor = topCard.color;
-            this.topValue = this.topValue;
+            this.topValue = topCard.value;
 
             if (this.topValue === 'wild-draw-four') {
                 this.deck.push(this.discardPile.pop());

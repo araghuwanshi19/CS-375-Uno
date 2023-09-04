@@ -20,10 +20,9 @@ const startBtn = document.getElementById('start-button');
 const lobbyPlayerListDiv = document.getElementById('lobby-player-list');
 
 // Game elements
+const colorSelect = document.getElementById('color-select');
 const gamePlayerListDiv = document.getElementById('player-list');
 const discardDiv = document.getElementById('discard-pile');
-const drawDiv = document.getElementById('draw-pile');
-const drawBtn = document.getElementById('draw-button');
 const handTable = document.getElementById('hand-table');
 
 // Helper functions
@@ -66,22 +65,34 @@ function addPlayer(username, cards = 0) {
 }
 
 function refreshPlayers(players) {
-    lobbyPlayerListDiv.innerHTML = "";
-    gamePlayerListDiv.innerHTML = "";
+    lobbyPlayerListDiv.innerText = "";
+    gamePlayerListDiv.innerText = "";
 
     for (let player of players) {
         addPlayer(player);
     }
 }
 
-function getCardListener(card_type, card_color) {
-    console.log(card_color, card_type);
+function setTopCard(card) {
+    discardDiv.className = card.color;
+    discardDiv.textContent = card.value;
 }
 
-function initializeGame(initialGameState) {
-    console.log('Starting the game with initial state:', initialGameState);
+function addCards(cards) {
+    for (let card of cards) {
+        let newCard = document.createElement("td");
+        newCard.className = card.color;
+        newCard.textContent = card.value;
+        newCard.addEventListener("click", () => {
+            socket.emit('playerMove', newCard.cellIndex);
+        });
+        handTable.appendChild(newCard);
+    }
 }
 
+function removeCard(index) {
+    handTable.removeChild(handTable.getElementsByTagName('td')[index]);
+}
 
 // Event listeners
 newLobbyBtn.addEventListener('click', () => {
@@ -97,15 +108,14 @@ startBtn.addEventListener('click', () => {
     socket.emit('startGame', roomCodeSpan.textContent);
 });
 
-drawBtn.addEventListener('click', () => {
-    const playerId = drawBtn.getAttribute('socket-id');
-    socket.emit('draw', playerId)
-});
-
-
+for (let colorBtn of colorSelect.getElementsByTagName('button')) {
+    colorBtn.addEventListener('click', () => {
+      socket.emit('colorChosen', roomCodeSpan.textContent, colorBtn.textContent.toLowerCase());
+      colorSelect.classList.remove('show');
+    });
+  }
 
 // Sockets
-
 socket.on('lobbyNotFound', () => {
     showMessage('Lobby not found');
 });
@@ -118,18 +128,9 @@ socket.on('lobbyCreated', (roomCode, username) => {
     addPlayer(username);
 });
 
-socket.on('startGame', (initialGameState) => {
-    lobbyDiv.style.display = 'none';
-    document.body.classList.add('game');
-    gameDiv.style.display = null;
-    showMessage('The game has begun!');
-
-    initializeGame(initialGameState);
-})
-
 socket.on('playerJoined', (roomCode, newPlayer, players) => {
     refreshPlayers(players);
-    if (newPlayer) {
+    if (currentPlayer === newPlayer) {
         dashDiv.style.display = 'none';
         roomCodeSpan.textContent = roomCode;
         lobbyDiv.style.display = null;
@@ -155,10 +156,38 @@ socket.on('notEnoughPlayers', () => {
 });
 
 socket.on('changeHost', () => {
-    showMessage('You are now the host');
-    startBtn.style.display = 'block';
-    startBtn.style.marginLeft = 'auto';
-    startBtn.style.marginRight = 'auto';
+    startBtn.style.display = null;
+    showMessage('You are the new host!');
 });
 
-socket.on('')
+socket.on('setupGame', (topCard, hand) => {
+    console.log(topCard, hand);
+    setTopCard(topCard);
+
+    addCards(hand);
+})
+
+socket.on('startGame', () => {
+    lobbyDiv.style.display = 'none';
+    document.body.classList.add('game');
+    gameDiv.style.display = null;
+    showMessage('The game has begun!');
+});
+
+socket.on('yourTurn', () => {
+    showMessage('It\'s your turn!');
+});
+
+socket.on('drawCards', (cards) => {
+    addCards(cards);
+    showMessage(`You drew ${cards.length} cards!`);
+});
+
+socket.on('playerChoseColor', (color) => {
+    showMessage(`The new color is ${color}!`);
+    discardDiv.style.backgroundColor = color.toLowerCase();
+});
+
+socket.on('chooseColor', () => {
+    colorSelect.classList.add('show');
+});
