@@ -130,7 +130,15 @@ wsServer.on('connection', (socket) => {
 		showMessage('It is now your turn!');
 		const currentPlayer = state.currentPlayer;
 		const game = rooms[state.roomCode].game;
-		const move = getPlayerMove(currentPlayer);
+
+		let move = ""
+		if (noValidCards(currentPlayer, game)) {
+			move = "draw"
+		}
+		else {
+			move = getPlayerMove(currentPlayer);
+		};
+
 		const newState = checkMove(move, game, currentPlayer);
 		if (move === "draw") {
 			wsServer.to(currentPlayer).emit('yourTurn');
@@ -142,7 +150,7 @@ wsServer.on('connection', (socket) => {
 
 		const gameOverState = game.checkWinConditions(currentPlayer, cardPlayed);
 		if (gameOverState.move === "won") {
-			wsServer.to(state.roomCode).emit('gameWon');
+			wsServer.to(game.roomCode).emit('gameWon');
 		}
 		else if (gameOverState.move === "restart") {
 			showMessage("Deck is out of cards! Shuffling...");
@@ -157,9 +165,24 @@ wsServer.on('connection', (socket) => {
 					wsServer.to(nextPlayer).emit('yourTurn');
 			};
 		};
-		//wsServer.emit(socket.id).emit('handleCard', card);
 	});
 
+	function noValidCards(playerId, game) {
+        for (const card of this.players[playerId]) {
+            if (isMatch(card, game)) {
+				return true;
+			};
+        };
+
+		return false;
+    };
+
+	function isMatch(card, game) {
+		const topColor = game.topColor;
+		const topValue = game.topValue;
+		
+		return (topColor === card.color || topValue === card.value);
+	};
 	
 	function checkMove(move, game, player) {
 		if (move === "draw") {

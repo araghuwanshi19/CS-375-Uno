@@ -31,10 +31,10 @@ class Uno {
     // Map each player ID to a "deck" (or list)
     createPlayerMap(playerIds) {
         const players = new Map();
-
         playerIds.forEach(id => {
             players.set([id], []);
         });
+
         return players;
     };
 
@@ -44,7 +44,7 @@ class Uno {
 
         for (const color of colors) {
             // Create the normal cards, two of each number from 1-9 (and one 0), for each color
-            deck.push({ type: "normal-card", color: color, number: 0 });
+            deck.push({ type: "normal-card", color: color, value: 0 });
             for (const number of numbers) {
                 deck.push({ type: "normal-card", color: color, value: number });
                 deck.push({ type: "normal-card", color: color, value: number });
@@ -316,7 +316,7 @@ class Uno {
         };
     };
 
-    getNormalCardGameState(playerId, move) {
+    getNormalCardGameState(playerId) {
         return {
             roomCode: this.code,
             deck: this.deck,
