@@ -15,7 +15,6 @@ const wsServer = socketIO(httpServer);
 
 const initializePassport = require('./passportConfig');
 const { Uno } = require('./uno');
-const { showMessage } = require('./static/js/game');
 
 initializePassport(passport);
 
@@ -111,16 +110,17 @@ wsServer.on('connection', (socket) => {
 	});
 
 	socket.on('startGame', (roomCode) => {
-		if (rooms[roomCode] && rooms[roomCode].players[0].id === socket.id) {
+		const room = rooms[roomCode];
+		if (room && room.players[0].id === socket.id) {
 			// check if there are atleast 2 players in lobby
-			if (rooms[roomCode].players.length >= 2) {
+			if (room.players.length >= 2) {
 				const unoGame = rooms[roomCode].game;
 				const initialGameState = unoGame.begin();
 
 				const firstPlayer = initialGameState.currentPlayer;
-				socket.emit('yourTurn', firstPlayer);
-				
 				wsServer.to(roomCode).emit('startGame', initialGameState);
+
+				socket.emit('yourTurn', firstPlayer);
 			} else {
 				socket.emit('notEnoughPlayers');
 			}
@@ -129,7 +129,7 @@ wsServer.on('connection', (socket) => {
 	
 	// TODO: figure out how to do turns
 	socket.on('yourTurn', () => {
-		showMessage('It is now your turn!');
+		//
 	});
 
 	// player actions
@@ -213,6 +213,10 @@ wsServer.on('connection', (socket) => {
 			};
 		};
 	});
+
+	socket.on('colorChosen', (roomCode, colorChosen) => {
+		wsServer.to(roomCode).emit('playerChoseColor', colorChosen);
+	});
 	
 	socket.on('selectPlayerToDraw', (state) => {
 		const numCards = state.numCards;
@@ -232,20 +236,23 @@ wsServer.on('connection', (socket) => {
 	socket.on('disconnect', () => {
 		console.log('A user disconnected:', socket.id);
 		for (const roomCode in rooms) {
-			const index = rooms[roomCode].players.map(x => x[1]).indexOf(socket.id);
+			const index = rooms[roomCode].players.map(x => x.id).indexOf(socket.id);
+			
+			if (index !== -1) {
+				let room = rooms[roomCode];
 
-			// If disconnected player was the host, change host
-			if (index === 0) {
-				wsServer.to(rooms[roomCode].players[1]).emit('changeHost');
-			}
-			else if (index !== -1) {
-				rooms[roomCode].players.splice(index, 1);
-				wsServer.to(roomCode).emit('playerLeft', rooms[roomCode].players.map(x => x[0]));
+				room.players.splice(index, 1);
+				wsServer.to(roomCode).emit('playerLeft', room.players.map(x => x.name));
 
 				// if a lobby has 0 players, delete lobby
-				if (rooms[roomCode].players.length === 0) {
+				if (room.players.length === 0) {
 					delete rooms[roomCode];
-				};
+				} else {
+					// Disconnected player was host, select new one
+					if (index == 0) {
+						wsServer.to(room.players[0].id).emit('changeHost');
+					}
+				}
 				break;
 			};
 		};
@@ -259,29 +266,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/game", checkNotAuthenticated, (req, res) => {
-	const socketId = userSockets.get(req.user.name);
-	console.log(socketId)
-	console.log(userSockets)
-	const state = {
-		state: "dashboard",
-		roomCode: "",
-		user: {
-			name: req.user.name,
-			socketId: socketId,
-			cards: [
-				{ color: "red", type: "four" },
-				{ color: "green", type: "four" },
-				{ color: "blue", type: "four" },
-				{ color: "yellow", type: "four" },
-				{ color: "red", type: "reverse" },
-				{ color: "blue", type: "skip" },
-				{ color: "red", type: "+2" },
-			],
-			isHost: false,
-		},
-		users: []
-	}
-	return res.render("game", state)
+	return res.render("game", {username: req.user.name})
 })
 
 app.get("/login", checkAuthenticated, (req, res) => {

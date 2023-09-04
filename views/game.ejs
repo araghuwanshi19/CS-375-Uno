@@ -5,16 +5,24 @@
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" type="text/css" href="css/game.css">
     <script>
-      const currentPlayer = "<%= user.name %>";
+      const currentPlayer = "<%= username %>";
     </script>
   </head>
   <body>
     <div id="message-container"></div>
 
-    <div id="dashboard-div" <% if (state != 'dashboard') { %> style="display: none;" <% } %>>
+    <div id="color-select">
+      <h1>Select Color</h1>
+      <button style="background-color: red; color: white;">Red</button>
+      <button style="background-color: yellow;">Yellow</button>
+      <button style="background-color: green; color: white;">Green</button>
+      <button style="background-color: blue; color: white;">Blue</button>
+    </div>
+
+    <div id="dashboard-div">
       <a href="/logout">Logout</a>
 
-      <h1>Hello, <span id="user"><%= user.name.charAt(0).toUpperCase() + user.name.slice(1) %></span>!</h1>
+      <h1>Hello, <span id="user"><%= username.charAt(0).toUpperCase() + username.slice(1) %></span>!</h1>
 
       <button id="newLobbyBtn">Start New Game</button>
 
@@ -24,54 +32,30 @@
       </div>
     </div>
     
-    <div id="lobby-div" <% if (state != 'lobby') { %> style="display: none;" <% } %>>
+    <div id="lobby-div" style="display: none;">
       <h1>Lobby</h1>
 
-      <h2>Room Code: <span id="room-code"><%= roomCode %></span></h2>
-      <button id="start-button" <% if (!user.isHost) { %> style="display: none;" <% } %>>Start Game</button>
+      <h2>Room Code: <span id="room-code"></span></h2>
+      <button id="start-button" style="display: none;">Start Game</button>
 
       <h2>Players:</h2>
-      <ul id="lobby-player-list">
-        <% users.forEach(function(user){ %>
-          <li>
-            <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
-            <h3><%= user.name %></h3>
-          </li>
-        <% }); %>
-      </ul>
+      <ul id="lobby-player-list"></ul>
     </div>
 
-    <div id="game-div" <% if (state != 'game') { %> style="display: none;" <% } %>>
+    <div id="game-div" style="display: none;">
       <div id="player-list-holder">
-        <ul id="player-list">
-          <% users.forEach(function(user){ %>
-            <li>
-              <img src="/img/person-outline.svg" alt="<%= user.name %> picture">
-              <h3><%= user.name %></h3>
-              <p>Cards: <%= user.numCards %></p>
-            </li>
-          <% }); %>
-        </ul>
+        <ul id="player-list"></ul>
       </div>
   
       <div id="piles">
         <div id="discard-pile">
           Red Four
         </div>
-        <div id="draw-pile">
-          <button id="draw-button" socket-id="<%= user.socketId%>">Draw Card</button>
-        </div>
       </div>
       
       <div id="hand">
-        <table id="hand-table">
-          <tr>
-            <% user.cards.forEach(function(card){ %>
-              <td style="background-color: <%= card.color %>" onclick="getCardListener(`<%=card.type %>`, `<%=card.color%>`)">
-                <%= card.color %> <%= card.type %>
-              </td>
-            <% }); %>
-          </tr>
+        <table>
+          <tr id="hand-table"></tr>
         </table>
       </div>
     </div>
