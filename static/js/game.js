@@ -20,10 +20,9 @@ const startBtn = document.getElementById('start-button');
 const lobbyPlayerListDiv = document.getElementById('lobby-player-list');
 
 // Game elements
+const colorSelect = document.getElementById('color-select');
 const gamePlayerListDiv = document.getElementById('player-list');
 const discardDiv = document.getElementById('discard-pile');
-const drawDiv = document.getElementById('draw-pile');
-const drawBtn = document.getElementById('draw-button');
 const handTable = document.getElementById('hand-table');
 
 // Helper functions
@@ -74,14 +73,21 @@ function refreshPlayers(players) {
     }
 }
 
-function getCardListener(card_type, card_color) {
-    console.log(card_color, card_type);
+function addCards(cards) {
+    for (let card of cards) {
+        let newCard = document.createElement("td");
+        newCard.style.background = card.color;
+        newCard.textContent = card.type;
+        newCard.addEventListener("click", () => {
+            socket.emit('playCard', newCard.cellIndex);
+        });
+        handTable.appendChild(newCard);
+    }
 }
 
-function initializeGame(initialGameState) {
-    console.log('Starting the game with initial state:', initialGameState);
+function removeCard(index) {
+    handTable.removeChild(handTable.getElementsByTagName('td')[index]);
 }
-
 
 // Event listeners
 newLobbyBtn.addEventListener('click', () => {
@@ -97,15 +103,14 @@ startBtn.addEventListener('click', () => {
     socket.emit('startGame', roomCodeSpan.textContent);
 });
 
-drawBtn.addEventListener('click', () => {
-    const playerId = drawBtn.getAttribute('socket-id');
-    socket.emit('draw', playerId)
-});
-
-
+for (let colorBtn of colorSelect.getElementsByTagName('button')) {
+    colorBtn.addEventListener('click', () => {
+      socket.emit('colorChosen', roomCodeSpan.textContent, colorBtn.textContent.toLowerCase());
+      colorSelect.classList.remove('show');
+    });
+  }
 
 // Sockets
-
 socket.on('lobbyNotFound', () => {
     showMessage('Lobby not found');
 });
@@ -123,13 +128,11 @@ socket.on('startGame', (initialGameState) => {
     document.body.classList.add('game');
     gameDiv.style.display = null;
     showMessage('The game has begun!');
-
-    initializeGame(initialGameState);
 })
 
 socket.on('playerJoined', (roomCode, newPlayer, players) => {
     refreshPlayers(players);
-    if (newPlayer) {
+    if (currentPlayer === newPlayer) {
         dashDiv.style.display = 'none';
         roomCodeSpan.textContent = roomCode;
         lobbyDiv.style.display = null;
@@ -155,8 +158,25 @@ socket.on('notEnoughPlayers', () => {
 });
 
 socket.on('changeHost', () => {
-    showMessage('You are now the host');
-    startBtn.style.display = 'block';
-    startBtn.style.marginLeft = 'auto';
-    startBtn.style.marginRight = 'auto';
+    startBtn.style.display = null;
+    showMessage('You are the new host!');
+});
+
+socket.on('drawCards', (cards) => {
+    addCards(cards);
+
+    if (gameDiv.style.display == 'none') {
+        return;
+    }
+
+    showMessage(`You drew ${cards.length} cards!`);
+});
+
+socket.on('playerChoseColor', (color) => {
+    showMessage(`The new color is ${color}!`);
+    discardDiv.style.backgroundColor = color.toLowerCase();
+});
+
+socket.on('chooseColor', () => {
+    colorSelect.classList.add('show');
 });
