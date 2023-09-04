@@ -42,7 +42,7 @@ class Uno {
 
         for (const color of colors) {
             // Create the normal cards, two of each number from 1-9 (and one 0), for each color
-            deck.push({ type: "normal-card", color: color, number: 0 });
+            deck.push({ type: "normal-card", color: color, value: 0 });
             for (const number of numbers) {
                 deck.push({ type: "normal-card", color: color, value: number });
                 deck.push({ type: "normal-card", color: color, value: number });
@@ -87,7 +87,7 @@ class Uno {
             this.discardPile.push(topCard);
 
             this.topColor = topCard.color;
-            this.topValue = topCard.topValue;
+            this.topValue = topCard.value;
 
             if (this.topValue === 'wild-draw-four') {
                 this.deck.push(this.discardPile.pop());

@@ -115,9 +115,10 @@ wsServer.on('connection', (socket) => {
                 const unoGame = new Uno(roomCode, room.players.map(x => x.id));
                 room.game = unoGame;
                 const initialGameState = unoGame.begin();
-                console.dir(initialGameState, { depth: 9 });
+                // console.dir(initialGameState, { depth: 9 });
 
                 for (let player of initialGameState.players) {
+					console.log("I'm working");
                     wsServer.to(player[0]).emit('setupGame', { color: initialGameState.topColor, value: initialGameState.topValue }, player[1]);
                 }
 
@@ -139,6 +140,11 @@ wsServer.on('connection', (socket) => {
     socket.on('discard', (playerId, card) => {
 
     });
+
+	//
+	socket.on('playerMove', (cardIndex) => {
+
+	});
 
     socket.on('draw', (playerId) => {
         socket.emit('handleState', state);
