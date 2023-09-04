@@ -144,52 +144,51 @@ wsServer.on('connection', (socket) => {
 	socket.on('handleState', (state) => {
 		switch (state.move) {
 			case "draw" : {
-				socket.emit('yourTurn', state.currentPlayer);
+				wsServer.to(state.currentPlayer).emit('yourTurn');
 				break;
 			};
 			case "discard" : {
 				const nextPlayer = getNextPlayer(state);
-				socket.emit('yourTurn', nextPlayer);
+				wsServer.to(nextPlayer).emit('yourTurn');
 				break;
 			};
 
 			// Turn progression cases
 			case "skip" : {
 				const nextPlayer = getNextPlayer(state);
-				socket.emit('yourTurn', nextPlayer);
+				wsServer.to(nextPlayer).emit('yourTurn');
 				break;
 			};
 			case "reverse" : {
 				const nextPlayer = getNextPlayer(state);
-				socket.emit('yourTurn', nextPlayer);
+				wsServer.to(nextPlayer).emit('yourTurn');
 				break;
 			};
 			
 			case "restart" : {
 				const nextPlayer = getNextPlayer(state);
-				socket.emit('yourTurn', nextPlayer);
+				wsServer.to(nextPlayer).emit('yourTurn');
 				break;
 			};
 
 			// Require player input
 			case "draw-cards" : {
-				socket.emit('selectPlayerToDraw', state);
+				wsServer.to(state.currentPlayer).emit('selectPlayerToDraw');
 				const nextPlayer = getNextPlayer(state);
-				socket.emit('yourTurn', nextPlayer);
+				wsServer.to(nextPlayer).emit('yourTurn');
 				break;
 			};
 
 			case "change-color" : {
-				socket.emit('selectColor');
+				wsServer.to(state.currentPlayer).emit('selectColor');
 				const nextPlayer = getNextPlayer(state);
-				socket.emit('yourTurn', nextPlayer);
+				wsServer.to(nextPlayer).emit('yourTurn');
 				break;
 			};
 
 			case "won" : {
-				showMessage()
 				break;
-			}
+			};
 		};
 	});
 
