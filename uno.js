@@ -1,3 +1,5 @@
+const socket = io();
+
 // Used for card data and types
 const actions = ["draw-two", "reverse", "skip-turn"];
 const wild_actions = ["draw-four", "change-color"];
@@ -6,7 +8,6 @@ const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 
 class Uno {
-    
     constructor(code, playerIds) {
         this.code = code;
         this.players = this.createPlayerMap(playerIds)
@@ -17,7 +18,7 @@ class Uno {
         this.topColor = "";
         this.topValue = "";
         this.skipNextPlayer = false;
-        this.clockwiseOrder = true;
+        this.reversed = true;
     };
 
     // Processes for starting a new game
@@ -27,7 +28,6 @@ class Uno {
         this.drawTopCard();
         return this.getBeginState();
     };
-
 
     // Map each player ID to a "deck" (or list)
     createPlayerMap(playerIds) {
@@ -45,23 +45,23 @@ class Uno {
 
         for (const color of colors) {
             // Create the normal cards, two of each number from 1-9 (and one 0), for each color
-            deck.push({type: "normal-card", color: color, number: 0});
+            deck.push({ type: "normal-card", color: color, number: 0 });
             for (const number of numbers) {
-                deck.push({type: "normal-card", color: color, value: number});
-                deck.push({type: "normal-card", color: color, value: number});
+                deck.push({ type: "normal-card", color: color, value: number });
+                deck.push({ type: "normal-card", color: color, value: number });
             };
 
             // Create the action cards, two of each action, for each color
             for (const action of actions) {
-                deck.push({type: "action-card", color: color, value: action});
-                deck.push({type: "action-card", color: color, value: action});
+                deck.push({ type: "action-card", color: color, value: action });
+                deck.push({ type: "action-card", color: color, value: action });
             };
         };
-        
+
         // Create the wild cards, four of each action
         for (let i = 0; i < 4; i++) {
             for (const action of wild_actions)
-            deck.push({type: "wild-card", color: "black", value: action});
+                deck.push({ type: "wild-card", color: "black", value: action });
         };
 
         return deck;
@@ -92,7 +92,7 @@ class Uno {
             this.topColor = topCard.color;
             this.topValue = this.topValue;
 
-            if(this.topValue === 'wild-draw-four') {
+            if (this.topValue === 'wild-draw-four') {
                 this.deck.push(this.discardPile.pop());
                 this.shuffle();
             } else {
@@ -100,7 +100,7 @@ class Uno {
             }
         }
     }
-    
+
     // If the deck runs out of cards, move all cards from the discard pile back to the deck
     putDiscardToDeck() {
         this.deck = this.discardPile;
@@ -118,6 +118,23 @@ class Uno {
         return this.getDrawCardsActionGameState(playerId, numCards);
     };
 
+    setColor(color) {
+        const colors = {
+            "r": "red",
+            "b": "blue",
+            "y": "yellow",
+            "g": "green",
+        };
+
+        const selectedColor = colors[color];
+        if (selectedColor) {
+            this.topColor = selectedColor;
+        }
+        else {
+            this.topColor = color;
+        };
+    };
+
     // Per turn functionality: occurs on each player turn
     drawCard(playerId) {
         const card = this.deck.pop();
@@ -130,22 +147,22 @@ class Uno {
             skipNext = false;
             return;
         };
-    
+
         const move = promptPlayerForMove(playerId);
         if (move === "draw") {
             const state = drawCard(playerId);
             return state;
         }
-    
+
         const winState = this.checkWinConditions(playerId)
         if (winState) {
             return winState;
         };
-    
+
         const turnState = doCardAction(playerId, move);
         return turnState;
     };
-    
+
     checkWinConditions(playerId, move) {
         if (players.get(playerId).length === 0) {
             return getPlayerWonGameState(playerId);
@@ -184,7 +201,7 @@ class Uno {
                 return state;
             };
         }
-        else if (this.isNormalCard(card)){
+        else if (this.isNormalCard(card)) {
             return this.getNormalCardGameState(playerId, move);
         };
     };
@@ -192,13 +209,13 @@ class Uno {
     reverseTurnOrder(playerId) {
         const reversedPlayers = new Map()
         const entries = Array.from(players.entries()).reverse();
-        
+
         for (const [key, value] of entries) {
             reversedMap.set(key, value);
         };
-    
+
         this.players = reversedPlayers;
-        this.clockwiseOrder = !this.clockwiseOrder;
+        this.reversed = !this.reversed;
         return getReverseOrderGameState(playerId);
     };
 
@@ -232,7 +249,30 @@ class Uno {
     };
 
     isChangeColorCard(card) {
-        return (card.value === "change-color");     
+        return (card.value === "change-color");
+    };
+
+
+    getNextPlayer(playerId, skipped=false, reversed=false) {
+        const keys = Array.from(this.players.keys());
+        const currentIndex = keys.indexOf(playerId);
+
+        let nextIndex;
+        let direction;
+        if (reversed) {
+            direction = -1;
+        }
+        else {
+            direction = 1;
+        }
+        if (skipped) {
+            nextIndex = (currentIndex + 2 * direction) % keys.length;
+        }
+        else {
+            nextIndex = (currentIndex + 1 * direction) % keys.length;
+        };
+
+        return this.players.get(keys[nextIndex]);
     };
 
 
@@ -241,66 +281,78 @@ class Uno {
         return {
             roomCode: this.code,
             deck: this.deck,
-            discardPile: this.discardPile,
+            discardPile: [],
             players: this.players,
             currentPlayer: this.getFirstPlayer(),
             topColor: this.topColor,
             topValue: this.topValue,
-            clockwiseOrder: true,
+            reversed: true,
             skipNext: false,
         };
     };
 
     getFirstPlayer() {
         const playerIds = Array.from(this.players.keys());
-        return playerIds[0];
-    }
+        return playerIds[0][0];
+    };
 
     getPlayerWonGameState(playerId) {
         return {
+            roomCode: this.code,
+            move: "won",
             winner: playerId,
         };
     };
-    
+
     getRestartGameState(playerId) {
         return {
+            roomCode: this.code,
             deck: this.deck,
             discard: this.discardPile,
             currentPlayer: playerId,
-            move: move,
+            move: "restart",
+            reversed: this.reversed,
             players: this.players,
             topColor: this.topColor,
             topValue: this.topValue,
         };
     };
-    
-    getPlayerDrewCardGameState(playerId, move) {
+
+    getPlayerDrewCardGameState(playerId, drawnCard) {
         return {
+            roomCode: this.code,
             deck: this.deck,
+            hand: this.players[playerId],
+            move: "draw",
+            reversed: this.reversed,
             currentPlayer: playerId,
-            move: move,
+            drawnCard: drawnCard,
         };
     };
-    
+
     getNormalCardGameState(playerId, move) {
         return {
+            roomCode: this.code,
             deck: this.deck,
             discard: this.discardPile,
             currentPlayer: playerId,
-            move: move,
+            move: "discard",
+            reversed: this.reversed,
             topColor: this.topColor,
             topValue: this.topValue,
         };
     };
-    
-    
+
+
     // Action card states
     getSkipCardGameState(playerId) {
         return {
+            roomCode: this.code,
             deck: this.deck,
             discard: this.discardPile,
             currentPlayer: playerId,
             move: "skip",
+            reversed: this.reversed,
             skipNext: this.skipNext,
             topColor: this.topColor,
             topValue: this.topValue,
@@ -309,45 +361,53 @@ class Uno {
 
     getReverseOrderGameState(playerId) {
         return {
+            roomCode: this.code,
             deck: this.deck,
             discard: discardPile,
             currentPlayer: playerId,
             move: "reverse",
-            players: this.players,
-            clockwiseOrder: this.clockwiseOrder,
+            reversed: this.reversed,
             topColor: this.topColor,
             topValue: this.topValue,
         };
     };
-    
+
 
     // Wild card states
     getDrawCardsActionGameState(currentPlayerId, numCards) {
         return {
+            roomCode: this.code,
             deck: this.deck,
             discard: this.discardPile,
             currentPlayer: currentPlayerId,
-            move: "draw",
-            numCardsToDraw: numCards,
-            playerToDrawCard: drawCardPlayerId,
+            move: "draw-cards",
+            numCards: numCards,
+            reversed: this.reversed,
             players: this.players,
             topColor: this.topColor,
             topValue: this.topValue,
         };
     };
-    
-    getColorChangeGameState(playerId) {
+
+    getColorChangeCardGameState(playerId) {
         return {
+            roomCode: this.code,
             deck: this.deck,
             discard: this.discardPile,
             currentPlayer: playerId,
             move: "change-color",
+            reversed: this.reversed,
             players: this.players,
             topColor: this.topColor,
             topValue: this.topValue,
         };
     };
+
+    getColorChangedGameState(playerId) {
+
+    }
 };
+
 
 module.exports = {
     Uno
