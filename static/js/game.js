@@ -84,7 +84,7 @@ function addCards(cards) {
         newCard.className = card.color;
         newCard.textContent = card.value;
         newCard.addEventListener("click", () => {
-            socket.emit('playCard', newCard.cellIndex);
+            socket.emit('playerMove', newCard.cellIndex);
         });
         handTable.appendChild(newCard);
     }
