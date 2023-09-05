@@ -16,7 +16,7 @@ class Uno {
         this.topColor = "";
         this.topValue = "";
         this.skipNextPlayer = false;
-        this.reversed = true;
+        this.reversed = false;
     };
 
     // Processes for starting a new game
@@ -31,7 +31,7 @@ class Uno {
     createPlayerMap(playerIds) {
         const players = new Map();
         playerIds.forEach(id => {
-            players.set([id], []);
+            players.set(id, []);
         });
 
         return players;
@@ -90,7 +90,7 @@ class Uno {
             this.topColor = topCard.color;
             this.topValue = topCard.value;
 
-            if (this.topValue === 'wild-draw-four') {
+            if (this.topValue === 'draw-four') {
                 this.deck.push(this.discardPile.pop());
                 this.shuffle();
             } else {
@@ -158,10 +158,10 @@ class Uno {
     };
 
     checkWinConditions(playerId, card) {
-        if (players.get(playerId).length === 0) {
+        if (this.players.get(playerId).length === 0) {
             return this.getPlayerWonGameState(playerId);
         }
-        else if (deck.length === 0) {
+        else if (this.deck.length === 0) {
             putDiscardToDeck();
             return this.getRestartGameState(playerId, card);
         }
@@ -177,10 +177,10 @@ class Uno {
 
     reverseTurnOrder(playerId) {
         const reversedPlayers = new Map()
-        const entries = Array.from(players.entries()).reverse();
+        const entries = Array.from(this.players.keys()).reverse();
 
         for (const [key, value] of entries) {
-            reversedMap.set(key, value);
+            reversedPlayers.set(key, value);
         };
 
         this.players = reversedPlayers;
@@ -256,8 +256,7 @@ class Uno {
         else {
             nextIndex = (currentIndex + 1 * direction) % keys.length;
         };
-
-        return this.players.get(keys[nextIndex]);
+        return keys[nextIndex];
     };
 
 
@@ -266,7 +265,7 @@ class Uno {
         return {
             roomCode: this.code,
             deck: this.deck,
-            discardPile: [],
+            discardPile: this.discardPile,
             players: this.players,
             currentPlayer: this.getFirstPlayer(),
             topColor: this.topColor,
@@ -278,7 +277,7 @@ class Uno {
 
     getFirstPlayer() {
         const playerIds = Array.from(this.players.keys());
-        return playerIds[0][0];
+        return playerIds[0];
     };
 
     getPlayerWonGameState(playerId) {

@@ -66,7 +66,6 @@ const inGamePlayers = new Set();
 
 // handle websocket connections
 wsServer.on('connection', (socket) => {
-    console.log('A user connected:', socket.request.user.name, socket.id);
     userSockets.set(socket.request.user.name, socket.id);
     socket.request.session.socketId = socket.id;
 
@@ -115,16 +114,14 @@ wsServer.on('connection', (socket) => {
                 const unoGame = new Uno(roomCode, room.players.map(x => x.id));
                 room.game = unoGame;
                 const initialGameState = unoGame.begin();
-                // console.dir(initialGameState, { depth: 9 });
 
                 for (let player of initialGameState.players) {
-                    console.log("I'm working");
                     wsServer.to(player[0]).emit('setupGame', { color: initialGameState.topColor, value: initialGameState.topValue }, player[1]);
                 }
 
                 wsServer.to(roomCode).emit('startGame');
 
-                socket.emit('yourTurn');
+                socket.emit('yourTurn', initialGameState, roomCode);
             } else {
                 socket.emit('notEnoughPlayers');
             }
@@ -132,27 +129,58 @@ wsServer.on('connection', (socket) => {
     });
 
     // TODO: figure out how to do turns
-    socket.on('yourTurn', (state) => {
-		showMessage('It is now your turn!');
+    socket.on('playerTurn', async(state, roomCode) => {
+		socket.emit('itsYourTurnMsg');
 		const currentPlayer = state.currentPlayer;
 		const game = rooms[state.roomCode].game;
 
-		let move = ""
-		if (noValidCards(currentPlayer, game)) {
+		let move = "apple"
+		let cardIndex = null;
+
+		if (game.topValue == 'change-color') {
+			socket.emit('chooseColor');
+		}
+
+		if (!noValidCards(currentPlayer, game)) {
 			move = "draw"
 		}
 		else {
-			socket.on('playerMove', (index) => {
-                move = game.players[currentPlayer][index];
-            });
-		};
+			const playerMovePromise = new Promise((resolve) => {
+				socket.on('playerMove', (index) => {
+					cardIndex = index; 
+					move = game.players.get(currentPlayer)[parseInt(index)];
+					resolve();
+				});
+			});
+			await playerMovePromise;
 
-		const newState = checkMove(move, game, currentPlayer);
+
+			if (isMatch(move, game)) {
+				socket.emit('removeCard', cardIndex);
+				wsServer.to(roomCode).emit('setTopCard', move);
+			} else {
+				socket.emit('invalidMove');
+				socket.emit('yourTurn', state);
+				return;
+			}
+		}
+
 		if (move === "draw") {
-			wsServer.to(currentPlayer).emit('yourTurn');
-			return;
-		};
+            const drawnCards = []
+            while (true) {
+                const state = game.drawCard(currentPlayer)
+                const card = state.drawnCard;
+                drawnCards.push(card);
+                if (isMatch(card, game)) {
+                    break;
+                };
+            };
 
+            socket.emit('drawCards', drawnCards);
+            game.players.get(playerId).push(...[drawnCards])
+        };
+
+		const newState = checkMove(move, game, currentPlayer, state);
 		game.setTopCard(move);
 
 		const gameOverState = game.checkWinConditions(currentPlayer, move);
@@ -160,51 +188,47 @@ wsServer.on('connection', (socket) => {
 			wsServer.to(game.roomCode).emit('gameWon');
 		}
 		else if (gameOverState.move === "restart") {
-			showMessage("Deck is out of cards! Shuffling...");
+			socket.emit('restartDeck');
 		}
 		else {
-			if (newState.move === "skip" ||
-				newState.move === "discard" ||
-				newState.move === "reverse" ||
-				newState.move === "draw-cards" ||
-				newState.move === "change-color") {
-					const nextPlayer = getNextPlayer(newState);
-					wsServer.to(nextPlayer).emit('yourTurn');
-			};
+			const nextPlayer = getNextPlayer(game, newState);
+			wsServer.to(nextPlayer).emit('yourTurn', newState, roomCode);
 		};
 	});
 
-    function checkMove(move, game, player) {
+    function checkMove(move, game, player, state) {
         if (move === "draw") {
             return game.drawCard(player);
         };
-        
-        const card = game.players[socket.id][move];
-        if (game.isNormalCard(card)) {
+
+        if (game.isNormalCard(move)) {
             return game.getNormalCardGameState(player);
         }
-        else if (game.isSkipCard(card)) {
+        else if (game.isSkipCard(move)) {
             return game.skipNext(player);
         }
-        else if (game.isDrawTwoCard(card)) {
-            const nextPlayer = getNextPlayer(player, reversed=game.reversed);
+        else if (game.isDrawTwoCard(move)) {
+            const nextPlayer = getNextPlayer(game, state);
             return game.drawCards(nextPlayer, 2);
         }
-        else if (game.isReverseCard(card)) {
+        else if (game.isReverseCard(move)) {
             return game.reverseTurnOrder(player);
         }
-        else if (game.isDrawFourCard(card)) {
-            const nextPlayer = getNextPlayer(player, reversed=game.reversed)
+        else if (game.isDrawFourCard(move)) {
+            const nextPlayer = getNextPlayer(game, state);
             return game.drawCards(nextPlayer, 4);
         }
-        else if (game.isChangeColorCard(card)) {
-            const color = getColorSelection(player);
-            return game.setColor(player, color);
-        }
+        // else if (game.isChangeColorCard(move)) {
+        //     const color = getColorSelection(player);
+        //     return game.setColor(player, color);
+        // }
     };
 
     function noValidCards(playerId, game) {
-        for (const card of this.players[playerId]) {
+		const hand = game.players.get(playerId);
+		
+        for (const card of hand) {
+
             if (isMatch(card, game)) {
                 return true;
             };
@@ -217,13 +241,12 @@ wsServer.on('connection', (socket) => {
         const topColor = game.topColor;
         const topValue = game.topValue;
         
-        return (topColor === card.color || topValue === card.value);
+        return (topColor === card.color || topValue === card.value || card.color === "black");
     };
     
 
-    function getNextPlayer(state) {
+    function getNextPlayer(game, state) {
         const currentPlayer = state.currentPlayer;
-        const game = rooms[state.roomCode].game;
         if (state.move === "skip") {
             return game.getNextPlayer(currentPlayer, skipped=true, reversed=state.reversed);
         };

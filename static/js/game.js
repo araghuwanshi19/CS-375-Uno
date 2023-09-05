@@ -73,25 +73,22 @@ function refreshPlayers(players) {
     }
 }
 
-function setTopCard(card) {
-    discardDiv.className = card.color;
-    discardDiv.textContent = card.value;
-}
-
 function addCards(cards) {
     for (let card of cards) {
         let newCard = document.createElement("td");
         newCard.className = card.color;
         newCard.textContent = card.value;
         newCard.addEventListener("click", () => {
+            console.log("Hello");
             socket.emit('playerMove', newCard.cellIndex);
         });
         handTable.appendChild(newCard);
     }
 }
 
-function removeCard(index) {
-    handTable.removeChild(handTable.getElementsByTagName('td')[index]);
+function setTopCard(card) {
+    discardDiv.className = card.color;
+    discardDiv.textContent = card.value;
 }
 
 // Event listeners
@@ -174,8 +171,8 @@ socket.on('startGame', () => {
     showMessage('The game has begun!');
 });
 
-socket.on('yourTurn', () => {
-    showMessage('It\'s your turn!');
+socket.on('yourTurn', (state, roomCode) => {
+    socket.emit('playerTurn', state, roomCode);
 });
 
 socket.on('drawCards', (cards) => {
@@ -183,7 +180,28 @@ socket.on('drawCards', (cards) => {
     showMessage(`You drew ${cards.length} cards!`);
 });
 
-socket.on('playerChoseColor', (color) => {
+socket.on('removeCard', (index) => {
+    handTable.removeChild(handTable.getElementsByTagName('td')[index]);
+});
+
+socket.on('setTopCard', (card) => {
+    discardDiv.className = card.color;
+    discardDiv.textContent = card.value;
+});
+
+socket.on('restartDeck', () => {
+    showMessage("Deck is out of cards! Shuffling...");
+});
+
+socket.on('itsYourTurnMsg', () => {
+    showMessage('It\'s your turn!');
+});
+
+socket.on('invalidMove', () => {
+    showMessage(`Invalid move! Try again`);
+});
+
+socket.on('colorChosen', (color) => {
     showMessage(`The new color is ${color}!`);
     discardDiv.style.backgroundColor = color.toLowerCase();
 });
