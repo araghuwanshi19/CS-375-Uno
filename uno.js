@@ -388,10 +388,6 @@ class Uno {
             topValue: this.topValue,
         };
     };
-
-    getColorChangedGameState(playerId) {
-
-    }
 };
 
 
