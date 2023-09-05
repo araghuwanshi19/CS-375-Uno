@@ -118,9 +118,10 @@ wsServer.on('connection', (socket) => {
 				const initialGameState = unoGame.begin();
 
 				const firstPlayer = initialGameState.currentPlayer;				
+				socket.emit('yourTurn', firstPlayer);
+				
 				wsServer.to(roomCode).emit('startGame', initialGameState);
-				wsServer.to(firstPlayer).emit('yourTurn', initialGameState);
-			} else {
+							} else {
 				socket.emit('notEnoughPlayers');
 			};
 		};
@@ -225,24 +226,12 @@ wsServer.on('connection', (socket) => {
 
 		return game.getNextPlayer(currentPlayer, skipped=false, reversed=state.reversed);
 	};
-
-	socket.on('selectColor', (state) => {
-		const colors = ["red", "blue", "yellow", "green", "r", "b", "y", "g"];
-		const game = rooms[state.roomCode].game;
-		while (true) {
-			const color = prompt('Select the new color');
-			if (colors.includes(newColor.toLowerCase())) {
-				game.setColor(color);
-				
-			};
-		};
-	});
-	
+    
 	socket.on('disconnect', () => {
 		console.log('A user disconnected:', socket.id);
 		for (const roomCode in rooms) {
 			const index = rooms[roomCode].players.map(x => x[1]).indexOf(socket.id);
-
+            
 			// If disconnected player was the host, change host
 			if (index === 0) {
 				wsServer.to(rooms[roomCode].players[1]).emit('changeHost');
