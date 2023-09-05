@@ -1,0 +1,26 @@
+html {
+    height: 100%;
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    -o-background-size: cover;
+    background-size: cover;
+    background-repeat:no-repeat;
+    background: rgb(0,154,150);
+    background: linear-gradient(45deg, rgba(0,154,150,1) 0%, rgba(0,212,255,1) 100%);
+    background: -webkit-linear-gradient(45deg, rgba(0,154,150,1) 0%, rgba(0,212,255,1) 100%);
+    background: -moz-linear-gradient(45deg, rgba(0,154,150,1) 0%, rgba(0,212,255,1) 100%);
+    background: -ms-linear-gradient(45deg, rgba(0,154,150,1) 0%, rgba(0,212,255,1) 100%);
+    background: -o-linear-gradient(45deg, rgba(0,154,150,1) 0%, rgba(0,212,255,1) 100%);
+    background: linear-gradient(45deg, rgba(0,154,150,1) 0%, rgba(0,212,255,1) 100%);
+}
+
+#content {
+    margin-top: 8rem;
+    text-align: center;
+}
+
+h1 {
+    font-size: 10em;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    margin-bottom: auto;
+}
