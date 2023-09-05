@@ -132,72 +132,48 @@ wsServer.on('connection', (socket) => {
     });
 
     // TODO: figure out how to do turns
-    socket.on('yourTurn', () => {
-        showMessage('It is now your turn!');
-        const currentPlayer = state.currentPlayer;
-        const game = rooms[state.roomCode].game;
-    });
+    socket.on('yourTurn', (state) => {
+		showMessage('It is now your turn!');
+		const currentPlayer = state.currentPlayer;
+		const game = rooms[state.roomCode].game;
 
-    // player actions
-    socket.on('discard', (playerId, card) => {
+		let move = ""
+		if (noValidCards(currentPlayer, game)) {
+			move = "draw"
+		}
+		else {
+			socket.on('playerMove', (index) => {
+                move = game.players[currentPlayer][index];
+            });
+		};
 
-    });
+		const newState = checkMove(move, game, currentPlayer);
+		if (move === "draw") {
+			wsServer.to(currentPlayer).emit('yourTurn');
+			return;
+		};
 
-    //
-    socket.on('playerMove', (cardIndex) => {
-        let move = ""
-        if (noValidCards(currentPlayer, game)) {
-            move = "draw"
-        }
-        else {
-            move = getPlayerMove(currentPlayer);
-        };
+		game.setTopCard(move);
 
-        const newState = checkMove(move, game, currentPlayer);
-        if (move === "draw") {
-            wsServer.to(currentPlayer).emit('yourTurn');
-            return;
-        };
+		const gameOverState = game.checkWinConditions(currentPlayer, move);
+		if (gameOverState.move === "won") {
+			wsServer.to(game.roomCode).emit('gameWon');
+		}
+		else if (gameOverState.move === "restart") {
+			showMessage("Deck is out of cards! Shuffling...");
+		}
+		else {
+			if (newState.move === "skip" ||
+				newState.move === "discard" ||
+				newState.move === "reverse" ||
+				newState.move === "draw-cards" ||
+				newState.move === "change-color") {
+					const nextPlayer = getNextPlayer(newState);
+					wsServer.to(nextPlayer).emit('yourTurn');
+			};
+		};
+	});
 
-        const cardPlayed = game.players[currentPlayer][move];
-        game.setTopCard(cardPlayed);
-
-        const gameOverState = game.checkWinConditions(currentPlayer, cardPlayed);
-        if (gameOverState.move === "won") {
-            wsServer.to(game.roomCode).emit('gameWon');
-        }
-        else if (gameOverState.move === "restart") {
-            showMessage("Deck is out of cards! Shuffling...");
-        }
-        else {
-            if (newState.move === "skip" ||
-                newState.move === "discard" ||
-                newState.move === "reverse" ||
-                newState.move === "draw-cards" ||
-                newState.move === "change-color") {
-                    const nextPlayer = getNextPlayer(newState);
-                    wsServer.to(nextPlayer).emit('yourTurn');
-            };
-        };
-    });
-
-    function noValidCards(playerId, game) {
-        for (const card of this.players[playerId]) {
-            if (isMatch(card, game)) {
-                return true;
-            };
-        };
-
-        return false;
-    };
-
-    function isMatch(card, game) {
-        const topColor = game.topColor;
-        const topValue = game.topValue;
-        
-        return (topColor === card.color || topValue === card.value);
-    };
-    
     function checkMove(move, game, player) {
         if (move === "draw") {
             return game.drawCard(player);
@@ -225,10 +201,25 @@ wsServer.on('connection', (socket) => {
             const color = getColorSelection(player);
             return game.setColor(player, color);
         }
-        else {
-            
-        };
     };
+
+    function noValidCards(playerId, game) {
+        for (const card of this.players[playerId]) {
+            if (isMatch(card, game)) {
+                return true;
+            };
+        };
+
+        return false;
+    };
+
+    function isMatch(card, game) {
+        const topColor = game.topColor;
+        const topValue = game.topValue;
+        
+        return (topColor === card.color || topValue === card.value);
+    };
+    
 
     function getNextPlayer(state) {
         const currentPlayer = state.currentPlayer;
